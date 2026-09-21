@@ -22,6 +22,15 @@ except Exception as _e:
     PDF_LIB_OK = False
     PDF_LIB_ERR = str(_e)
 
+# 標籤機直送需要 PyMuPDF（把 PDF 點陣化成 ZPL）；缺少時退回系統列印路徑
+try:
+    import fitz  # PyMuPDF
+    ZPL_OK = True
+    ZPL_ERR = ''
+except Exception as _e:
+    ZPL_OK = False
+    ZPL_ERR = str(_e)
+
 app = Flask(__name__)
 CORS(app)
 
@@ -302,30 +311,64 @@ def print_waybill():
                 writer.add_page(page)
             print_mode = "A4 整張模式"
         
-        # 4. 保存到臨時文件（打印後刪除）
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-            writer.write(tmp)
-            tmp_path = tmp.name
+        # 4. 合併後的 PDF 位元組（不落地，直接產生）
+        buf = io.BytesIO()
+        writer.write(buf)
+        merged_pdf = buf.getvalue()
+        page_count = len(writer.pages)
         
-        # 乾跑模式：只驗證 PDF 產生結果，不送印（測試用）
+        # 乾跑模式：只驗證 PDF/ZPL 產生結果，不送印（測試用）
         if data.get('dry_run'):
-            page_count = len(writer.pages)
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-            return jsonify({
+            info = {
                 "success": True,
                 "dry_run": True,
                 "mode": print_mode,
                 "pages": page_count,
+                "pdf_bytes": len(merged_pdf),
                 "printer": printer_name,
                 "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo')
-            })
+            }
+            if is_label_printer:
+                ip = _printer_ip(printer_name)
+                info['zpl_target'] = (ip + ':9100') if ip else None
+                if ip and ZPL_OK:
+                    try:
+                        info['zpl_bytes'] = len(build_zpl_from_pdf(merged_pdf))
+                    except Exception as e:
+                        info['zpl_error'] = str(e)
+                elif not ZPL_OK:
+                    info['zpl_error'] = 'PyMuPDF 不可用'
+            return jsonify(info)
         
-        # 5. 發送到打印機
-        #    不能用 ShellExecute 的 PrintTo（印表機名不會進到 Foxit 的 /t），
-        #    要用註冊表 printto 指令列 → 實測才會真的進標籤機佇列。
+        # 5a. 標籤機首選：自己把 PDF 點陣化成 ZPL，直送印表機 9100 埠。
+        #     完全不依賴 PDF 閱讀程式（Foxit/Acrobat/...）或 Windows 驅動，
+        #     所以任何一台電腦都能印，不會出現「印表機名沒傳進去」的問題。
+        zpl_err = ''
+        if is_label_printer:
+            ip = _printer_ip(printer_name)
+            if not ip:
+                zpl_err = '無法取得印表機 IP'
+            elif not ZPL_OK:
+                zpl_err = 'PyMuPDF 不可用'
+            else:
+                try:
+                    zpl = build_zpl_from_pdf(merged_pdf)
+                    send_zpl_via_tcp(zpl, ip)
+                    return jsonify({
+                        "success": True,
+                        "message": f"已直送 {printer_name} ({print_mode})",
+                        "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
+                        "mode": print_mode,
+                        "send_method": f"ZPL 直送 {ip}:9100 ({len(zpl)} bytes)"
+                    })
+                except Exception as e:
+                    zpl_err = str(e)
+        
+        # 5b. 退回：寫暫存檔，交給系統/PDF 處理程式列印
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+            tmp.write(merged_pdf)
+            tmp_path = tmp.name
+        
         ok, method = send_pdf_to_printer(tmp_path, printer_name)
         if not ok:
             try:
@@ -333,6 +376,8 @@ def print_waybill():
             except Exception:
                 pass
             return jsonify({"success": False, "error": "送印失敗：" + method}), 500
+        if zpl_err:
+            method = method + f"（ZPL 直送未用：{zpl_err}）"
         
         # 6. 刪除臨時文件（延遲 2 秒確保打印完成）
         import threading
@@ -370,6 +415,69 @@ def _pdf_handler_printto_template():
             return winreg.QueryValueEx(k, None)[0]
     except Exception:
         return None
+
+
+def _printer_ip(printer_name):
+    """取得印表機 IP：先從名稱抓（例 'ZD420 (192.168.168.251)'），否則查 Windows 印表機埠。"""
+    import re
+    m = re.search(r'(\d{1,3}(?:\.\d{1,3}){3})', printer_name or '')
+    if m:
+        return m.group(1)
+    try:
+        ps = ('$p=(Get-Printer -Name "%s" -ErrorAction SilentlyContinue).PortName;'
+              'if($p){(Get-PrinterPort -Name $p -ErrorAction SilentlyContinue).PrinterHostAddress}') % printer_name
+        out = subprocess.run(['powershell', '-NoProfile', '-Command', ps],
+                             capture_output=True, text=True, timeout=30).stdout
+        m = re.search(r'(\d{1,3}(?:\.\d{1,3}){3})', out or '')
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return None
+
+
+def build_zpl_from_pdf(pdf_bytes, width_mm=102, height_mm=210, dpmm=8, threshold=128):
+    """把 PDF 每一頁點陣化成 1-bit 並轉成 ZPL（^GFA 點陣圖）。
+
+    完全不依賴任何 PDF 閱讀程式或 Windows 驅動，任何電腦都能用。
+    dpmm=8 對應 ZD420 的 203dpi（8 dots/mm）。
+    """
+    import fitz  # PyMuPDF
+    w = int(round(width_mm * dpmm))
+    h = int(round(height_mm * dpmm))
+    bpr = (w + 7) // 8                     # 每列位元組數
+    doc = fitz.open(stream=pdf_bytes, filetype='pdf')
+
+    # 灰階 → 0/1（1 = 黑點）的查表；再轉成 ASCII '0'/'1' 供 int(.., 2) 打包
+    to_bit = bytes(1 if i < threshold else 0 for i in range(256))
+    to_ascii = bytes(48 + (1 if i < threshold else 0) for i in range(256))
+
+    pages = []
+    for page in doc:
+        mat = fitz.Matrix(w / page.rect.width, h / page.rect.height)
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY, alpha=False)
+        bits = pix.samples.translate(to_ascii)          # 每像素一個 '0'/'1'
+        stride = pix.stride
+        rows = []
+        for y in range(h):
+            row_bytes = bits[y * stride: y * stride + w]
+            if len(row_bytes) < w:
+                row_bytes = row_bytes + b'0' * (w - len(row_bytes))
+            packed = int(row_bytes, 2).to_bytes(bpr, 'big')
+            rows.append(packed)
+        data = b''.join(rows)
+        pages.append(
+            '^XA\n^PW{}\n^LL{}\n^FO0,0\n^GFA,{},{},{},{}\n^FS\n^XZ\n'.format(
+                w, h, len(data), len(data), bpr, data.hex().upper())
+        )
+    return ''.join(pages).encode('ascii')
+
+
+def send_zpl_via_tcp(zpl_bytes, ip, port=9100, timeout=120):
+    """直接把 ZPL 位元組送到印表機的 9100 埠（Zebra 標準 raw 埠）。"""
+    import socket
+    with socket.create_connection((ip, port), timeout=timeout) as s:
+        s.sendall(zpl_bytes)
 
 
 def send_pdf_to_printer(file_path, printer_name):
@@ -874,6 +982,7 @@ if __name__ == '__main__':
     print("\n環境:")
     print(f"  Python: {sys.version.split()[0]}  ({sys.executable})")
     print(f"  列印模組 PyPDF2: {'✓ 可用' if PDF_LIB_OK else '✗ 缺少 - ' + PDF_LIB_ERR}")
+    print(f"  標籤直送 PyMuPDF: {'✓ 可用（ZPL 直送 9100）' if ZPL_OK else '✗ 缺少 - 退回系統列印' + ('' if ZPL_OK else ' - ' + ZPL_ERR)}")
     print("\n注意：請先啟動 keepalive_service.py 維護 token")
     print("\n服務器啟動中...")
     print("請在瀏覽器中打開: http://localhost:5000")
