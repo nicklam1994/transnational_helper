@@ -324,8 +324,15 @@ def print_waybill():
             })
         
         # 5. 發送到打印機
-        ps_cmd = f'Start-Process -FilePath "{tmp_path}" -Verb PrintTo -ArgumentList "{printer_name}"'
-        subprocess.run(['powershell', '-Command', ps_cmd], check=True)
+        #    不能用 ShellExecute 的 PrintTo（印表機名不會進到 Foxit 的 /t），
+        #    要用註冊表 printto 指令列 → 實測才會真的進標籤機佇列。
+        ok, method = send_pdf_to_printer(tmp_path, printer_name)
+        if not ok:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+            return jsonify({"success": False, "error": "送印失敗：" + method}), 500
         
         # 6. 刪除臨時文件（延遲 2 秒確保打印完成）
         import threading
@@ -343,13 +350,88 @@ def print_waybill():
             "success": True,
             "message": f"已發送到 {printer_name} ({print_mode})",
             "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
-            "mode": print_mode
+            "mode": print_mode,
+            "send_method": method
         })
         
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _pdf_handler_printto_template():
+    """從註冊表取得 .pdf 處理程式的 printto 指令範本（例如 Foxit 的 /t "%1" "%2"）。"""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, '.pdf') as k:
+            handler = winreg.QueryValueEx(k, None)[0]
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, handler + r'\shell\printto\command') as k:
+            return winreg.QueryValueEx(k, None)[0]
+    except Exception:
+        return None
+
+
+def send_pdf_to_printer(file_path, printer_name):
+    """把 PDF 送到指定印表機，回傳 (成功, 使用的方法說明)。
+
+    重要：不能用 PowerShell 的 `Start-Process -Verb PrintTo -ArgumentList "<printer>"`。
+    ShellExecute 不會把印表機名餵進 PDF 處理程式的 /t 參數（Foxit 會只把檔案打開，
+    彈出列印對話框，標籤機佇列全程 0 個工作）。必須直接照註冊表 printto 範本組指令列。
+    """
+    import subprocess, re
+    CREATE_NO_WINDOW = 0x08000000
+
+    # 方法 1（首選）：PDF 處理程式的 printto 指令列，例如
+    # "D:\\Foxit Software\\Foxit PDF Editor\\FoxitPDFEditor.exe" /t "%1" "%2" "%3" "%4"
+    tpl = _pdf_handler_printto_template()
+    if tpl:
+        m = re.match(r'^\s*"([^"]+)"\s*(.*)$', tpl)
+        if m:
+            exe, rest = m.group(1), m.group(2)
+        else:
+            parts = tpl.split(None, 1)
+            exe, rest = parts[0], (parts[1] if len(parts) > 1 else '')
+        if exe and os.path.exists(exe):
+            args = [exe]
+            for tok in re.findall(r'"[^"]*"|\S+', rest):
+                val = tok.strip('"')
+                val = (val.replace('%1', file_path)
+                          .replace('%2', printer_name)
+                          .replace('%3', '')
+                          .replace('%4', ''))
+                if val:  # 空的佔位符不要傳
+                    args.append(val)
+            try:
+                r = subprocess.run(args, timeout=180, capture_output=True, text=True,
+                                   creationflags=CREATE_NO_WINDOW)
+                if r.returncode == 0:
+                    return True, 'PDF 處理程式指令列: ' + os.path.basename(exe)
+                err = (r.stderr or r.stdout or '').strip()[:200]
+            except Exception as e:
+                err = str(e)
+        else:
+            err = '處理程式不存在: ' + str(exe)
+    else:
+        err = '找不到 printto 指令範本'
+
+    # 方法 2（退回）：ShellExecute PrintTo
+    try:
+        ps = f'Start-Process -FilePath "{file_path}" -Verb PrintTo -ArgumentList "{printer_name}"'
+        subprocess.run(['powershell', '-NoProfile', '-Command', ps], check=True, timeout=120,
+                       creationflags=CREATE_NO_WINDOW)
+        return True, 'ShellExecute PrintTo（退回）'
+    except Exception as e:
+        err = err + ' / PrintTo 也失敗: ' + str(e)
+
+    # 方法 3（最後）：送到系統預設印表機
+    try:
+        ps = f'Start-Process -FilePath "{file_path}" -Verb Print'
+        subprocess.run(['powershell', '-NoProfile', '-Command', ps], check=True, timeout=120,
+                       creationflags=CREATE_NO_WINDOW)
+        return True, '系統預設印表機（退回）'
+    except Exception as e:
+        return False, err + ' / 預設印表機也失敗: ' + str(e)
 
 
 @app.route('/api/order-detail', methods=['POST'])
