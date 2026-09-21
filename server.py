@@ -12,6 +12,16 @@ import json
 import os
 import time
 
+# 列印功能需要 PyPDF2（缺少時給出明確提示，而不是原始 500）
+try:
+    from PyPDF2 import PdfReader, PdfWriter, Transformation
+    from PyPDF2.generic import RectangleObject
+    PDF_LIB_OK = True
+    PDF_LIB_ERR = ''
+except Exception as _e:
+    PDF_LIB_OK = False
+    PDF_LIB_ERR = str(_e)
+
 app = Flask(__name__)
 CORS(app)
 
@@ -141,6 +151,206 @@ def get_orders():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/printers', methods=['GET'])
+def get_printers():
+    """獲取所有可用打印機列表"""
+    import subprocess
+    try:
+        # 使用 PowerShell 獲取打印機列表
+        result = subprocess.run(
+            ['powershell', '-Command', 'Get-Printer | Select-Object Name, PortName | ConvertTo-Json'],
+            capture_output=True, text=True, check=True
+        )
+        printers = json.loads(result.stdout)
+        if isinstance(printers, dict):
+            printers = [printers]
+        
+        # 返回所有打印機，前端會根據名稱判斷類型
+        all_printers = [{"name": p.get('Name'), "port": p.get('PortName')} for p in printers]
+        
+        return jsonify({
+            "success": True,
+            "printers": all_printers
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/print-waybill', methods=['POST'])
+def print_waybill():
+    """列印運單 - 根據打印機類型自動選擇處理方式"""
+    import tempfile
+    import subprocess
+    
+    data = request.json or {}
+    invoice_id = data.get('InvoiceId')
+    printer_name = data.get('printer', 'ZD420')
+    
+    if not invoice_id:
+        return jsonify({"success": False, "error": "缺少 InvoiceId"}), 400
+    
+    if not PDF_LIB_OK:
+        return jsonify({
+            "success": False,
+            "error": "伺服器缺少 PyPDF2，無法處理列印。請執行 pip install PyPDF2 後重啟（詳情：" + PDF_LIB_ERR + "）"
+        }), 500
+    
+    # 判斷是否為標籤打印機
+    is_label_printer = 'ZD' in printer_name.upper() or 'LABEL' in printer_name.upper()
+    
+    try:
+        # 1. 獲取訂單詳情
+        headers = api_headers()
+        if not headers:
+            return jsonify({"success": False, "error": "無法獲取 token"}), 500
+        
+        response = requests.post(
+            "https://hk-teamwork-api-rp.transnational-grp.com/api/Order/GetOrderByOrderId",
+            json={"InvoiceId": invoice_id, "CD": "HKTeamwork"},
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            return jsonify({"success": False, "error": f"API 錯誤: {response.status_code}"}), 500
+        
+        result = response.json()
+        if not result.get('IsSuccess'):
+            return jsonify({"success": False, "error": result.get('Message', 'API 返回失敗')}), 500
+        
+        # receiptFile 位於 Result[0].Order.Table[0]（不是 Result[0] 直層）
+        order_detail = result.get('Result', [{}])[0]
+        receipt_url = order_detail.get('receiptFile')
+        order_row = {}
+        if not receipt_url:
+            order_table = ((order_detail.get('Order') or {}).get('Table') or [])
+            if order_table:
+                order_row = order_table[0]
+                receipt_url = order_row.get('receiptFile')
+        if not order_row:
+            order_table = ((order_detail.get('Order') or {}).get('Table') or [])
+            order_row = order_table[0] if order_table else {}
+        
+        if not receipt_url:
+            return jsonify({"success": False, "error": "沒有收據文件"}), 400
+        
+        # 2. 下載 PDF 到內存
+        pdf_response = requests.get(receipt_url, headers=headers, timeout=30)
+        if pdf_response.status_code != 200:
+            return jsonify({"success": False, "error": f"下載 PDF 失敗: {pdf_response.status_code}"}), 500
+        
+        import io
+        
+        if is_label_printer:
+            # 標籤打印機：切割處理，分兩張打印
+            pdf_bytes = io.BytesIO(pdf_response.content)
+            reader = PdfReader(pdf_bytes)
+            
+            mm = 72 / 25.4
+            label_w = 102 * mm
+            label_h = 210 * mm
+            
+            # 上半部分：表格 Y 441.8-802.0（去掉 Order created By）
+            top_crop = {'x0': 20, 'y0': 441.8, 'x1': 575, 'y1': 802.0, 'h': 360.2}
+            # 下半部分：表格 Y 42.1-402.3（去掉底部的自我）
+            bottom_crop = {'x0': 0, 'y0': 42.1, 'x1': 575, 'y1': 402.3, 'h': 360.2}
+            
+            def calc(crop, label_w, label_h):
+                rotated_w = crop['h']
+                rotated_h = crop['x1'] - crop['x0']
+                scale = min(label_w / rotated_w, label_h / rotated_h)
+                scaled_w = rotated_w * scale
+                scaled_h = rotated_h * scale
+                x_off = (label_w - scaled_w) / 2
+                y_off = (label_h - scaled_h) / 2
+                return scale, x_off, y_off
+            
+            writer = PdfWriter()
+            
+            # 上半
+            page1 = reader.pages[0]
+            page1.mediabox = RectangleObject((top_crop['x0'], top_crop['y0'], top_crop['x1'], top_crop['y1']))
+            top_scale, top_x_off, top_y_off = calc(top_crop, label_w, label_h)
+            a, b, c, d = 0, -top_scale, top_scale, 0
+            e = -top_crop['y0'] * top_scale + top_x_off
+            f = top_crop['x1'] * top_scale + top_y_off
+            page1.add_transformation(Transformation((a, b, c, d, e, f)))
+            page1.mediabox = RectangleObject((0, 0, label_w, label_h))
+            page1.cropbox = RectangleObject((0, 0, label_w, label_h))
+            writer.add_page(page1)
+            
+            # 下半
+            reader2 = PdfReader(io.BytesIO(pdf_response.content))
+            page2 = reader2.pages[0]
+            page2.mediabox = RectangleObject((bottom_crop['x0'], bottom_crop['y0'], bottom_crop['x1'], bottom_crop['y1']))
+            bot_scale, bot_x_off, bot_y_off = calc(bottom_crop, label_w, label_h)
+            a, b, c, d = 0, -bot_scale, bot_scale, 0
+            e = -bottom_crop['y0'] * bot_scale + bot_x_off
+            f = bottom_crop['x1'] * bot_scale + bot_y_off
+            page2.add_transformation(Transformation((a, b, c, d, e, f)))
+            page2.mediabox = RectangleObject((0, 0, label_w, label_h))
+            page2.cropbox = RectangleObject((0, 0, label_w, label_h))
+            writer.add_page(page2)
+            
+            print_mode = "標籤模式（2張）"
+        else:
+            # 普通打印機：直接打印 A4 整張
+            writer = PdfWriter()
+            reader = PdfReader(io.BytesIO(pdf_response.content))
+            for page in reader.pages:
+                writer.add_page(page)
+            print_mode = "A4 整張模式"
+        
+        # 4. 保存到臨時文件（打印後刪除）
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+            writer.write(tmp)
+            tmp_path = tmp.name
+        
+        # 乾跑模式：只驗證 PDF 產生結果，不送印（測試用）
+        if data.get('dry_run'):
+            page_count = len(writer.pages)
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+            return jsonify({
+                "success": True,
+                "dry_run": True,
+                "mode": print_mode,
+                "pages": page_count,
+                "printer": printer_name,
+                "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo')
+            })
+        
+        # 5. 發送到打印機
+        ps_cmd = f'Start-Process -FilePath "{tmp_path}" -Verb PrintTo -ArgumentList "{printer_name}"'
+        subprocess.run(['powershell', '-Command', ps_cmd], check=True)
+        
+        # 6. 刪除臨時文件（延遲 2 秒確保打印完成）
+        import threading
+        def cleanup():
+            import time
+            time.sleep(2)
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
+        
+        threading.Thread(target=cleanup, daemon=True).start()
+        
+        return jsonify({
+            "success": True,
+            "message": f"已發送到 {printer_name} ({print_mode})",
+            "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
+            "mode": print_mode
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route('/api/order-detail', methods=['POST'])
 def order_detail():
@@ -570,13 +780,18 @@ def geo_zones():
 
 
 if __name__ == '__main__':
+    import sys
     print("=" * 60)
     print("德安物流小助手 (Flask Server)")
     print("=" * 60)
     print("\n功能:")
     print("  ✓ 訂單詳情（搜索、過濾、統計）")
+    print("  ✓ 運單列印（標籤 2 張 / A4 整張）")
     print("  ✓ 物流查詢")
     print("  ✓ Token 從 token.json 自動讀取")
+    print("\n環境:")
+    print(f"  Python: {sys.version.split()[0]}  ({sys.executable})")
+    print(f"  列印模組 PyPDF2: {'✓ 可用' if PDF_LIB_OK else '✗ 缺少 - ' + PDF_LIB_ERR}")
     print("\n注意：請先啟動 keepalive_service.py 維護 token")
     print("\n服務器啟動中...")
     print("請在瀏覽器中打開: http://localhost:5000")

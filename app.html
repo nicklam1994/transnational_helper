@@ -910,7 +910,11 @@
         <div class="nav-menu">
             <div class="nav-item active" onclick="switchPage('orders')">
                 <span class="nav-icon">📦</span>
-                <span class="nav-text">訂單詳情</span>
+                <span class="nav-text">全部訂單</span>
+            </div>
+            <div class="nav-item" onclick="switchPage('print')">
+                <span class="nav-icon">🖨️</span>
+                <span class="nav-text">運單列印</span>
             </div>
             <div class="nav-item" onclick="switchPage('report')">
                 <span class="nav-icon">📊</span>
@@ -920,18 +924,18 @@
                 <span class="nav-icon">🔍</span>
                 <span class="nav-text">物流查詢</span>
             </div>
-                    <div class="nav-item" onclick="switchPage('address')">
+            <div class="nav-item" onclick="switchPage('address')">
                 <span class="nav-icon">📍</span>
                 <span class="nav-text">地址管理</span>
             </div>
-</div>
+        </div>
     </div>
     
     <!-- 主內容區 -->
     <div class="main-content">
         <!-- 訂單詳情頁面 -->
         <div id="orders-page" class="page active">
-            <h2 class="page-title">訂單詳情</h2>
+            <h2 class="page-title">全部訂單</h2>
             <p class="page-subtitle">查看所有訂單及其狀態</p>
             
             <!-- 統計卡片 -->
@@ -1217,6 +1221,45 @@
             </div>
         </div>
         
+        <!-- 運單列印頁面 -->
+        <div id="print-page" class="page">
+            <h2 class="page-title">🖨️ 運單列印</h2>
+            <p class="page-subtitle">搜索訂單並批量列印運單</p>
+            
+            <!-- 打印機設置 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="color: #a0a0a0; font-size: 14px;">默認打印機：</label>
+                        <select id="default-printer-select" style="padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; min-width: 250px;">
+                            <option value="" style="background: #1a1a2e; color: #fff;">載入中...</option>
+                        </select>
+                        <button onclick="loadPrintersForPrintPage()" style="padding: 6px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; cursor: pointer;" title="刷新打印機列表">🔄</button>
+                    </div>
+                    <button onclick="saveDefaultPrinter()" class="btn btn-primary" style="padding: 8px 16px;">💾 保存為默認</button>
+                </div>
+            </div>
+            
+            <!-- 搜索區域 -->
+            <div class="filter-bar">
+                <input type="text" class="search-box" id="print-search-box" placeholder="搜索訂單編號（支持逗號分隔多個）、客戶參考編號、客戶名..." oninput="searchPrintOrders()">
+            </div>
+            
+            <!-- 操作按鈕 -->
+            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                <button onclick="selectAllPrintOrders()" class="btn btn-secondary btn-sm">全選</button>
+                <button onclick="deselectAllPrintOrders()" class="btn btn-secondary btn-sm">取消全選</button>
+                <button onclick="printSelectedOrders()" class="btn btn-primary btn-sm">🖨️ 列印選中 (<span id="print-selected-count">0</span>)</button>
+            </div>
+            
+            <!-- 訂單列表 -->
+            <div class="loading" id="print-loading">
+                <div class="spinner"></div>
+                <p>載入訂單中...</p>
+            </div>
+            <div id="print-orders-list" style="margin-top: 20px;"></div>
+        </div>
+        
     <script>
         let allOrders = [];
         
@@ -1228,16 +1271,20 @@
             if (page === 'orders') {
                 document.getElementById('orders-page').classList.add('active');
                 document.querySelectorAll('.nav-item')[0].classList.add('active');
+            } else if (page === 'print') {
+                document.getElementById('print-page').classList.add('active');
+                document.querySelectorAll('.nav-item')[1].classList.add('active');
+                loadPrintPage();
             } else if (page === 'report') {
                 document.getElementById('report-page').classList.add('active');
-                document.querySelectorAll('.nav-item')[1].classList.add('active');
+                document.querySelectorAll('.nav-item')[2].classList.add('active');
                 loadReport();
             } else if (page === 'tracking') {
                 document.getElementById('tracking-page').classList.add('active');
-                document.querySelectorAll('.nav-item')[2].classList.add('active');
+                document.querySelectorAll('.nav-item')[3].classList.add('active');
             } else if (page === 'address') {
                 document.getElementById('address-page').classList.add('active');
-                document.querySelectorAll('.nav-item')[3].classList.add('active');
+                document.querySelectorAll('.nav-item')[4].classList.add('active');
                 loadAddresses();
             }
         }
@@ -1328,7 +1375,10 @@
                             <div><strong>客戶:</strong> ${order.DeliveryBranchName || '-'}</div>
                             <div><strong>取件:</strong> ${order.PickupDate || '-'} ${order.PickupTime || ''}</div>
                             <div><strong>送達:</strong> ${order.DeliveryDate || '-'} ${order.DeliveryTime || ''}</div>
-                            <div style="color: #667eea; margin-top: 8px; font-size: 12px;">點擊查看詳情 →</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                                <div style="color: #667eea; font-size: 12px;">點擊查看詳情 →</div>
+                                <button onclick="event.stopPropagation(); quickPrintWaybill(${order.InvoiceId}, this)" style="padding: 4px 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 6px; color: #fff; font-size: 12px; cursor: pointer; white-space: nowrap;" title="快速列印">🖨️ 快速列印</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1594,6 +1644,354 @@
         }
         
 
+        // 打印機管理
+        let allPrinters = [];
+        
+        function loadPrinters() {
+            fetch('/api/printers')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    allPrinters = data.printers || [];
+                    
+                    // 更新訂單詳情頁的打印機選擇器
+                    const sel = document.getElementById('printer-select');
+                    if (sel) {
+                        sel.innerHTML = '';
+                        allPrinters.forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = p.name;
+                            opt.textContent = p.name + (p.port ? ' (' + p.port + ')' : '');
+                            sel.appendChild(opt);
+                        });
+                        // 默認選 ZD420
+                        for (let o of sel.options) {
+                            if (o.value.includes('ZD420')) { sel.value = o.value; break; }
+                        }
+                    }
+                })
+                .catch(e => console.error('載入打印機失敗:', e));
+        }
+        
+        // 預設打印機：自動挑一台 ZD 標籤機並記住（避免用到不存在的 'ZD420' 名稱）
+        async function initDefaultPrinter() {
+            const saved = localStorage.getItem('defaultPrinter');
+            if (saved) {
+                try {
+                    const r = await fetch('/api/printers');
+                    const d = await r.json();
+                    if (d.success && (d.printers || []).some(p => p.name === saved)) return;
+                } catch (e) { return; }
+            }
+            try {
+                const r = await fetch('/api/printers');
+                const d = await r.json();
+                if (d.success && (d.printers || []).length) {
+                    const pick = d.printers.find(p => /ZD/i.test(p.name)) || d.printers[0];
+                    localStorage.setItem('defaultPrinter', pick.name);
+                    console.log('已設定預設打印機:', pick.name);
+                }
+            } catch (e) { console.error('初始化打印機失敗:', e); }
+        }
+        
+        function loadPrintersForPrintPage() {
+            fetch('/api/printers')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    allPrinters = data.printers || [];
+                    
+                    const sel = document.getElementById('default-printer-select');
+                    if (sel) {
+                        sel.innerHTML = '';
+                        allPrinters.forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = p.name;
+                            opt.textContent = p.name + (p.port ? ' (' + p.port + ')' : '');
+                            opt.style.background = '#1a1a2e';
+                            opt.style.color = '#fff';
+                            sel.appendChild(opt);
+                        });
+                        
+                        // 載入保存的默認打印機
+                        const savedPrinter = localStorage.getItem('defaultPrinter');
+                        if (savedPrinter) {
+                            sel.value = savedPrinter;
+                        } else {
+                            // 默認選 ZD420
+                            for (let o of sel.options) {
+                                if (o.value.includes('ZD420')) { sel.value = o.value; break; }
+                            }
+                        }
+                    }
+                })
+                .catch(e => console.error('載入打印機失敗:', e));
+        }
+        
+        function saveDefaultPrinter() {
+            const sel = document.getElementById('default-printer-select');
+            if (sel && sel.value) {
+                localStorage.setItem('defaultPrinter', sel.value);
+                showToast('✅ 已保存默認打印機', 'ok');
+            }
+        }
+        
+        // 解析預設打印機（沒有就自動挑一台）
+        async function resolvePrinter() {
+            let p = localStorage.getItem('defaultPrinter');
+            if (!p) {
+                await initDefaultPrinter();
+                p = localStorage.getItem('defaultPrinter');
+            }
+            return p;
+        }
+        
+        async function printWaybill(invoiceId, printerName) {
+            // 如果沒有指定打印機，使用默認打印機
+            const printer = printerName || await resolvePrinter();
+            if (!printer) {
+                showToast('❌ 請先在「運單列印」設定預設打印機', 'err');
+                return;
+            }
+            
+            fetch('/api/print-waybill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ InvoiceId: invoiceId, printer: printer })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ ' + data.message, 'ok');
+                } else {
+                    showToast('❌ ' + (data.error || '列印失敗'), 'err');
+                }
+            })
+            .catch(e => showToast('❌ ' + e.message, 'err'));
+        }
+        
+        async function quickPrintWaybill(invoiceId, button) {
+            // 快速列印 - 使用默認打印機
+            const printer = await resolvePrinter();
+            if (!printer) {
+                showToast('❌ 請先在「運單列印」設定預設打印機', 'err');
+                return;
+            }
+            const originalText = button.innerHTML;
+            
+            button.innerHTML = '⏳';
+            button.disabled = true;
+            
+            fetch('/api/print-waybill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ InvoiceId: invoiceId, printer: printer })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ ' + data.message, 'ok');
+                } else {
+                    showToast('❌ ' + (data.error || '列印失敗'), 'err');
+                }
+            })
+            .catch(e => showToast('❌ ' + e.message, 'err'))
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        // 運單列印頁面功能
+        let printPageOrders = [];
+        let selectedOrderIds = new Set();
+        
+        function loadPrintPage() {
+            loadPrintersForPrintPage();
+            // 載入所有訂單
+            fetch('/api/orders')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        printPageOrders = data.orders || [];
+                        renderPrintOrdersList(printPageOrders);
+                    }
+                })
+                .catch(e => console.error('載入訂單失敗:', e));
+        }
+        
+        function searchPrintOrders() {
+            const searchBox = document.getElementById('print-search-box');
+            const searchTerm = searchBox ? searchBox.value.trim().toLowerCase() : '';
+            
+            if (!searchTerm) {
+                renderPrintOrdersList(printPageOrders);
+                return;
+            }
+            
+            // 支持逗號分隔的多個訂單號
+            const searchTerms = searchTerm.split(',').map(s => s.trim()).filter(s => s);
+            
+            const filtered = printPageOrders.filter(order => {
+                return searchTerms.some(term => {
+                    return (order.OrderNo && order.OrderNo.toLowerCase().includes(term)) ||
+                           (order.AlternateRefNo && order.AlternateRefNo.toLowerCase().includes(term)) ||
+                           (order.DeliveryBranchName && order.DeliveryBranchName.toLowerCase().includes(term));
+                });
+            });
+            
+            renderPrintOrdersList(filtered);
+        }
+        
+        function renderPrintOrdersList(orders) {
+            const container = document.getElementById('print-orders-list');
+            if (!container) return;
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: #a0a0a0;">沒有找到訂單</div>';
+                return;
+            }
+            
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">';
+            
+            orders.forEach(order => {
+                const isSelected = selectedOrderIds.has(order.InvoiceId);
+                const statusClass = getStatusClass(order.Status);
+                
+                html += `
+                    <div style="background: rgba(255,255,255,0.05); border: 2px solid ${isSelected ? '#667eea' : 'transparent'}; border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s;" onclick="toggleOrderSelection(${order.InvoiceId})">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <div style="font-size: 16px; font-weight: 600; color: #fff;">#${order.OrderNo || '-'}</div>
+                                <div style="font-size: 12px; color: #a0a0a0; margin-top: 4px;">${order.AlternateRefNo || '-'}</div>
+                            </div>
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} style="width: 20px; height: 20px; cursor: pointer;" onclick="event.stopPropagation(); toggleOrderSelection(${order.InvoiceId})">
+                        </div>
+                        <div style="font-size: 13px; color: #ccc; margin-bottom: 8px;">
+                            <div><strong>客戶:</strong> ${order.DeliveryBranchName || '-'}</div>
+                            <div><strong>取件:</strong> ${order.PickupDate || '-'}</div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="${statusClass}" style="font-size: 12px; padding: 4px 8px; border-radius: 4px;">${order.Status || '-'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+            
+            updateSelectedCount();
+        }
+        
+        function toggleOrderSelection(invoiceId) {
+            if (selectedOrderIds.has(invoiceId)) {
+                selectedOrderIds.delete(invoiceId);
+            } else {
+                selectedOrderIds.add(invoiceId);
+            }
+            
+            // 重新渲染列表
+            const searchBox = document.getElementById('print-search-box');
+            const searchTerm = searchBox ? searchBox.value.trim().toLowerCase() : '';
+            
+            if (!searchTerm) {
+                renderPrintOrdersList(printPageOrders);
+            } else {
+                searchPrintOrders();
+            }
+        }
+        
+        function selectAllPrintOrders() {
+            const searchBox = document.getElementById('print-search-box');
+            const searchTerm = searchBox ? searchBox.value.trim().toLowerCase() : '';
+            
+            let ordersToSelect = printPageOrders;
+            if (searchTerm) {
+                const searchTerms = searchTerm.split(',').map(s => s.trim()).filter(s => s);
+                ordersToSelect = printPageOrders.filter(order => {
+                    return searchTerms.some(term => {
+                        return (order.OrderNo && order.OrderNo.toLowerCase().includes(term)) ||
+                               (order.AlternateRefNo && order.AlternateRefNo.toLowerCase().includes(term)) ||
+                               (order.DeliveryBranchName && order.DeliveryBranchName.toLowerCase().includes(term));
+                    });
+                });
+            }
+            
+            ordersToSelect.forEach(order => selectedOrderIds.add(order.InvoiceId));
+            
+            if (!searchTerm) {
+                renderPrintOrdersList(printPageOrders);
+            } else {
+                searchPrintOrders();
+            }
+        }
+        
+        function deselectAllPrintOrders() {
+            selectedOrderIds.clear();
+            
+            const searchBox = document.getElementById('print-search-box');
+            const searchTerm = searchBox ? searchBox.value.trim().toLowerCase() : '';
+            
+            if (!searchTerm) {
+                renderPrintOrdersList(printPageOrders);
+            } else {
+                searchPrintOrders();
+            }
+        }
+        
+        function updateSelectedCount() {
+            const countEl = document.getElementById('print-selected-count');
+            if (countEl) {
+                countEl.textContent = selectedOrderIds.size;
+            }
+        }
+        
+        async function printSelectedOrders() {
+            if (selectedOrderIds.size === 0) {
+                showToast('請先選擇要列印的訂單', 'err');
+                return;
+            }
+            
+            const printer = localStorage.getItem('defaultPrinter') || 'ZD420';
+            const orderIds = Array.from(selectedOrderIds);
+            
+            showToast(`正在列印 ${orderIds.length} 個訂單...`, 'ok');
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const invoiceId of orderIds) {
+                try {
+                    const response = await fetch('/api/print-waybill', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ InvoiceId: invoiceId, printer: printer })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        console.error('列印失敗:', data.error);
+                    }
+                } catch (e) {
+                    failCount++;
+                    console.error('列印錯誤:', e);
+                }
+                
+                // 每個訂單之間延遲 1 秒，避免過快
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            if (failCount === 0) {
+                showToast(`✅ 成功列印 ${successCount} 個訂單`, 'ok');
+            } else {
+                showToast(`⚠️ 成功 ${successCount} 個，失敗 ${failCount} 個`, 'err');
+            }
+        }
+
         // 模態框功能
         function openOrderDetail(invoiceId, orderNo) {
             const modal = document.getElementById('order-modal');
@@ -1616,6 +2014,8 @@
                     return;
                 }
                 renderOrderDetail(data, content);
+                // 載入打印機列表
+                setTimeout(loadPrinters, 100);
             })
             .catch(error => {
                 content.innerHTML = `<div class="no-results">請求失敗: ${error.message}</div>`;
@@ -1629,6 +2029,7 @@
         function renderOrderDetail(data, container) {
             const orderDetail = data.orderDetail || {};
             const statusList = data.orderStatus || [];
+            const invoiceId = orderDetail.InvoiceId;
             
             // 獲取訂單信息 - Result[0] 結構: {Order: {Table: [...]}, OrderValume: {Table: [...]}, OrderProduct: {Table: []}}
             const orderTable = (orderDetail.Order && orderDetail.Order.Table) || [];
@@ -2100,6 +2501,7 @@
         
         // 頁面載入時載入訂單
         window.addEventListener('load', loadOrders);
+        window.addEventListener('load', initDefaultPrinter);
 
         // ================= 地址管理 =================
         let allAddresses = [];
