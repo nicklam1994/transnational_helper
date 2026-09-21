@@ -1,0 +1,337 @@
+[
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 1
+  },
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 2
+  },
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 3
+  },
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 4
+  },
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 5
+  },
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 6
+  },
+  {
+    "ZoneId": 1,
+    "ZoneName": "HK-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 7
+  },
+  {
+    "ZoneId": 2,
+    "ZoneName": "KLN-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 8
+  },
+  {
+    "ZoneId": 2,
+    "ZoneName": "KLN-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 9
+  },
+  {
+    "ZoneId": 2,
+    "ZoneName": "KLN-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 10
+  },
+  {
+    "ZoneId": 2,
+    "ZoneName": "KLN-A-Sheung Wan to Tai Koo Shing",
+    "DistrictId": 11
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 12
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 13
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 14
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 15
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 16
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 17
+  },
+  {
+    "ZoneId": 3,
+    "ZoneName": "HK-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 18
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 19
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 20
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 21
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 22
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 23
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 24
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 25
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 26
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 27
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 28
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 29
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 30
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 31
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 32
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 33
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 34
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 35
+  },
+  {
+    "ZoneId": 4,
+    "ZoneName": "KLN-B-Shau Kei Wan to Tsuen Wan",
+    "DistrictId": 36
+  },
+  {
+    "ZoneId": 5,
+    "ZoneName": "HK-C-Rest of Hong Kong & Shantin Tai Wai",
+    "DistrictId": 37
+  },
+  {
+    "ZoneId": 5,
+    "ZoneName": "HK-C-Rest of Hong Kong & Shantin Tai Wai",
+    "DistrictId": 38
+  },
+  {
+    "ZoneId": 6,
+    "ZoneName": "NT-C-Rest of Hong Kong & Shantin Tai Wai",
+    "DistrictId": 39
+  },
+  {
+    "ZoneId": 6,
+    "ZoneName": "NT-C-Rest of Hong Kong & Shantin Tai Wai",
+    "DistrictId": 40
+  },
+  {
+    "ZoneId": 6,
+    "ZoneName": "NT-C-Rest of Hong Kong & Shantin Tai Wai",
+    "DistrictId": 41
+  },
+  {
+    "ZoneId": 7,
+    "ZoneName": "KLN-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 42
+  },
+  {
+    "ZoneId": 7,
+    "ZoneName": "KLN-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 43
+  },
+  {
+    "ZoneId": 7,
+    "ZoneName": "KLN-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 44
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 45
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 46
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 47
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 48
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 49
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 50
+  },
+  {
+    "ZoneId": 8,
+    "ZoneName": "NT-D-Clear Water Bay & Tuen Mun",
+    "DistrictId": 51
+  },
+  {
+    "ZoneId": 9,
+    "ZoneName": "NT-E-Chek Lap Kok & Outlying Island",
+    "DistrictId": 52
+  },
+  {
+    "ZoneId": 10,
+    "ZoneName": "OYI-E-Chek Lap Kok & Outlying Island",
+    "DistrictId": 53
+  },
+  {
+    "ZoneId": 10,
+    "ZoneName": "OYI-E-Chek Lap Kok & Outlying Island",
+    "DistrictId": 54
+  },
+  {
+    "ZoneId": 10,
+    "ZoneName": "OYI-E-Chek Lap Kok & Outlying Island",
+    "DistrictId": 55
+  },
+  {
+    "ZoneId": 10,
+    "ZoneName": "OYI-E-Chek Lap Kok & Outlying Island",
+    "DistrictId": 56
+  },
+  {
+    "ZoneId": 10,
+    "ZoneName": "OYI-E-Chek Lap Kok & Outlying Island",
+    "DistrictId": 57
+  },
+  {
+    "ZoneId": 11,
+    "ZoneName": "F-Macau",
+    "DistrictId": 58
+  },
+  {
+    "ZoneId": 12,
+    "ZoneName": "G-Guangdong",
+    "DistrictId": 59
+  },
+  {
+    "ZoneId": 13,
+    "ZoneName": "H-Jiangsu",
+    "DistrictId": 60
+  },
+  {
+    "ZoneId": 14,
+    "ZoneName": "I-Zhejiang",
+    "DistrictId": 61
+  },
+  {
+    "ZoneId": 15,
+    "ZoneName": "J-Fujian",
+    "DistrictId": 62
+  },
+  {
+    "ZoneId": 16,
+    "ZoneName": "K-Beijing",
+    "DistrictId": 63
+  },
+  {
+    "ZoneId": 17,
+    "ZoneName": "L-Tianjin",
+    "DistrictId": 64
+  },
+  {
+    "ZoneId": 18,
+    "ZoneName": "M-Qingdao",
+    "DistrictId": 65
+  },
+  {
+    "ZoneId": 19,
+    "ZoneName": "N-Shanghai",
+    "DistrictId": 66
+  },
+  {
+    "ZoneId": 20,
+    "ZoneName": "O-China Others",
+    "DistrictId": 67
+  }
+]

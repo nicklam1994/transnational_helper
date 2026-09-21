@@ -25,3 +25,16 @@ token.json
 *.log
 *.sqlite
 *.db
+
+# Sensitive data - DHL address book
+dhl_addressbook_raw.json
+DHL_AddressBook_1420.csv
+DHL通訊錄_1420筆.csv
+DHL通訊錄_1420筆.xlsx
+
+# Sensitive data - Teamwork import
+Teamwork_待匯入地址_*.xlsx
+api_test_results.json
+
+# Screenshots
+*.png

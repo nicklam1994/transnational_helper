@@ -1,0 +1,44 @@
+[
+  {
+    "CityId": 1,
+    "CityName": "Macau",
+    "CountryId": 1,
+    "LanguageId": 0,
+    "CD": null
+  },
+  {
+    "CityId": 2,
+    "CityName": "Hong Kong Island",
+    "CountryId": 1,
+    "LanguageId": 0,
+    "CD": null
+  },
+  {
+    "CityId": 3,
+    "CityName": "Kowloon",
+    "CountryId": 1,
+    "LanguageId": 0,
+    "CD": null
+  },
+  {
+    "CityId": 4,
+    "CityName": "China",
+    "CountryId": 1,
+    "LanguageId": 0,
+    "CD": null
+  },
+  {
+    "CityId": 5,
+    "CityName": "New Territories",
+    "CountryId": 1,
+    "LanguageId": 0,
+    "CD": null
+  },
+  {
+    "CityId": 6,
+    "CityName": "Outlying Island",
+    "CountryId": 1,
+    "LanguageId": 0,
+    "CD": null
+  }
+]

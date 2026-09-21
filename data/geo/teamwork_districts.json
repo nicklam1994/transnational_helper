@@ -1,0 +1,337 @@
+[
+  {
+    "DistrictId": 1,
+    "DistrictName": "105-Causeway Bay",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 2,
+    "DistrictName": "102-Central",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 3,
+    "DistrictName": "106-North Point",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 4,
+    "DistrictName": "107-Quarry Bay",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 5,
+    "DistrictName": "103-Queensway",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 6,
+    "DistrictName": "101-Sheung Wan",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 7,
+    "DistrictName": "104-Wan Chai",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 8,
+    "DistrictName": "202-Jordan",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 9,
+    "DistrictName": "204-Mong Kok",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 10,
+    "DistrictName": "201-Tsim Sha Tsui",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 11,
+    "DistrictName": "203-Yaumati",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 12,
+    "DistrictName": "405-Aberdeen",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 13,
+    "DistrictName": "404-Chai Wan",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 14,
+    "DistrictName": "108-Happy Valley",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 15,
+    "DistrictName": "406-Mid-Level",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 16,
+    "DistrictName": "401-Sai Ying Pun",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 17,
+    "DistrictName": "403-Shau Ki Wan",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 18,
+    "DistrictName": "402-West Point",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 19,
+    "DistrictName": "207-Cheung Sha Wan",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 20,
+    "DistrictName": "301-Ho Man Tin",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 21,
+    "DistrictName": "302-Hung Hom",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 22,
+    "DistrictName": "307-Kowloon Bay",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 23,
+    "DistrictName": "304-Kowloon City",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 24,
+    "DistrictName": "501-Kowloon Tong",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 25,
+    "DistrictName": "505-Kwai Chung",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 26,
+    "DistrictName": "308-Kwun Tong",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 27,
+    "DistrictName": "208-Lai Chi Kok",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 28,
+    "DistrictName": "503-Lam Tin",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 29,
+    "DistrictName": "306-Ngau Tau Kok",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 30,
+    "DistrictName": "305-San Po Kong",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 31,
+    "DistrictName": "206-Sham Shui Po",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 32,
+    "DistrictName": "205-Tai Kok Tsui",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 33,
+    "DistrictName": "303-To Ka Wan",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 34,
+    "DistrictName": "506-Tsuen Wan",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 35,
+    "DistrictName": "502-Wong Tai Sin",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 36,
+    "DistrictName": "504-Yau Tong",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 37,
+    "DistrictName": "602-Bay Area",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 38,
+    "DistrictName": "601-Peak Area",
+    "CityId": 2
+  },
+  {
+    "DistrictId": 39,
+    "DistrictName": "609-Fotan",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 40,
+    "DistrictName": "605-Shatin",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 41,
+    "DistrictName": "604-Tai Wai",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 42,
+    "DistrictName": "607-Sai Kung",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 43,
+    "DistrictName": "608-Tseung Kwan O",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 44,
+    "DistrictName": "603-Tsing Yi",
+    "CityId": 3
+  },
+  {
+    "DistrictId": 45,
+    "DistrictName": "702-Fanling",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 46,
+    "DistrictName": "606-Ma On Shan",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 47,
+    "DistrictName": "610-Sham Tseng",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 48,
+    "DistrictName": "703-Sheung Shui",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 49,
+    "DistrictName": "701-Tai Po",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 50,
+    "DistrictName": "801-Tuen Mun",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 51,
+    "DistrictName": "802-Yuen Long",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 52,
+    "DistrictName": "901-Chek Lap Kok",
+    "CityId": 5
+  },
+  {
+    "DistrictId": 53,
+    "DistrictName": "903-Cheung Chau",
+    "CityId": 6
+  },
+  {
+    "DistrictId": 54,
+    "DistrictName": "905-Discovery Bay",
+    "CityId": 6
+  },
+  {
+    "DistrictId": 55,
+    "DistrictName": "906-Lamma Island",
+    "CityId": 6
+  },
+  {
+    "DistrictId": 56,
+    "DistrictName": "904-Lantau Island",
+    "CityId": 6
+  },
+  {
+    "DistrictId": 57,
+    "DistrictName": "902-Outlying Island",
+    "CityId": 6
+  },
+  {
+    "DistrictId": 58,
+    "DistrictName": "1001-Macau",
+    "CityId": 1
+  },
+  {
+    "DistrictId": 59,
+    "DistrictName": "1101-Guangdong",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 60,
+    "DistrictName": "1102-Jiangsu",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 61,
+    "DistrictName": "1103-Zhejiang",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 62,
+    "DistrictName": "1104-Fujian",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 63,
+    "DistrictName": "1105-Beijing",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 64,
+    "DistrictName": "1106-Tianjin",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 65,
+    "DistrictName": "1107-Qingdao",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 66,
+    "DistrictName": "1108-Shanghai",
+    "CityId": 4
+  },
+  {
+    "DistrictId": 67,
+    "DistrictName": "1109-China Others",
+    "CityId": 4
+  }
+]
