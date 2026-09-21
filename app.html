@@ -1764,13 +1764,15 @@
                     // 格式: "07/Sep/2026 10:23 AM"
                     const match = order.OrderDate.match(/(\d{2})\/(\w{3})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)/);
                     if (!match) return;
+                    const status = (order.Status || '').trim();
                     reportRecords.push({
                         y: match[3],
                         m: reportMonthMap[match[2]] || '01',
                         d: match[1],
                         hour: parseInt(match[4]),
                         period: match[6],
-                        cancelled: REPORT_CANCELLED_STATUSES.includes((order.Status || '').trim())
+                        cancelled: REPORT_CANCELLED_STATUSES.includes(status),
+                        deliveryException: status === 'Delivery Exception'
                     });
                 });
                 
@@ -1879,27 +1881,30 @@
             const byDay = {};
             reportRecords.forEach(r => {
                 if (r.y !== year || r.m !== month) return;
-                if (!byDay[r.d]) byDay[r.d] = { AM: 0, PM: 0, cAM: 0, cPM: 0, d: r.d };
+                if (!byDay[r.d]) byDay[r.d] = { AM: 0, PM: 0, cAM: 0, cPM: 0, deAM: 0, dePM: 0, d: r.d };
                 byDay[r.d][r.period]++;
                 if (r.cancelled) byDay[r.d][r.period === 'AM' ? 'cAM' : 'cPM']++;
+                if (r.deliveryException) byDay[r.d][r.period === 'AM' ? 'deAM' : 'dePM']++;
             });
             const days = Object.values(byDay).sort((a, b) => a.d.localeCompare(b.d));
             if (days.length === 0) return '<div class="no-results">該月沒有訂單</div>';
             
-            let tAM = 0, tPM = 0, tC = 0;
-            days.forEach(x => { tAM += x.AM; tPM += x.PM; tC += x.cAM + x.cPM; });
+            let tAM = 0, tPM = 0, tC = 0, tDE = 0;
+            days.forEach(x => { tAM += x.AM; tPM += x.PM; tC += x.cAM + x.cPM; tDE += x.deAM + x.dePM; });
             const tAll = tAM + tPM;
             
             let rows = '';
             days.forEach((x, idx) => {
                 const bg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
                 const c = x.cAM + x.cPM;
+                const de = x.deAM + x.dePM;
                 rows += `<tr style="background: ${bg};">
                     <td style="padding: 10px 16px; font-size: 14px;">${year}/${month}/${x.d} (${reportMonthNames[parseInt(month)-1]})</td>
                     <td style="${TD} color: #2196F3;">${numText(x.AM, x.cAM)}</td>
                     <td style="${TD} color: #ff9800;">${numText(x.PM, x.cPM)}</td>
                     <td style="${TD} font-weight: 600;">${numText(x.AM + x.PM, c)}</td>
                     <td style="${TD} color: #ef5350;">${c || '-'}</td>
+                    <td style="${TD} color: #ff9800;">${de || '-'}</td>
                 </tr>`;
             });
             
@@ -1912,6 +1917,7 @@
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">PM</th>
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">當日總計</th>
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">Cancelled</th>
+                            <th style="padding: 12px 16px; text-align: center; font-size: 13px;">Delivery Exception</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
                         <tfoot><tr style="background: rgba(102,126,234,0.15); font-weight: 700;">
@@ -1920,6 +1926,7 @@
                             <td style="padding: 12px 16px; text-align: center; color: #ff9800;">${numText(tPM, days.reduce((s,x)=>s+x.cPM,0))}</td>
                             <td style="padding: 12px 16px; text-align: center;">${numText(tAll, tC)}</td>
                             <td style="padding: 12px 16px; text-align: center; color: #ef5350;">${tC || '-'}</td>
+                            <td style="padding: 12px 16px; text-align: center; color: #ff9800;">${tDE || '-'}</td>
                         </tr></tfoot>
                     </table>
                 </div>${LEGEND}`;
@@ -1945,9 +1952,10 @@
                     key = r.m;
                     label = reportMonthNames[mNum-1];
                 }
-                if (!byBucket[key]) byBucket[key] = { AM: 0, PM: 0, cAM: 0, cPM: 0, key: key, label: label, sort: key };
+                if (!byBucket[key]) byBucket[key] = { AM: 0, PM: 0, cAM: 0, cPM: 0, deAM: 0, dePM: 0, key: key, label: label, sort: key };
                 byBucket[key][r.period]++;
                 if (r.cancelled) byBucket[key][r.period === 'AM' ? 'cAM' : 'cPM']++;
+                if (r.deliveryException) byBucket[key][r.period === 'AM' ? 'deAM' : 'dePM']++;
             });
             
             const buckets = Object.values(byBucket).sort((a, b) => a.sort.localeCompare(b.sort));
@@ -1957,6 +1965,7 @@
             const tPM = buckets.reduce((s,x)=>s+x.PM,0);
             const tAMc = buckets.reduce((s,x)=>s+x.cAM,0);
             const tPMc = buckets.reduce((s,x)=>s+x.cPM,0);
+            const tDE = buckets.reduce((s,x)=>s+x.deAM+x.dePM,0);
             const tC = tAMc + tPMc;
             const tAll = tAM + tPM;
             
@@ -1967,12 +1976,14 @@
             buckets.forEach((x, idx) => {
                 const bg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
                 const c = x.cAM + x.cPM;
+                const de = x.deAM + x.dePM;
                 rows += `<tr style="background: ${bg};">
                     <td style="padding: 10px 16px; font-size: 14px;">${year}年 ${x.label}</td>
                     <td style="${TD} color: #2196F3;">${numText(x.AM, x.cAM)}</td>
                     <td style="${TD} color: #ff9800;">${numText(x.PM, x.cPM)}</td>
                     <td style="${TD} font-weight: 600;">${numText(x.AM + x.PM, c)}</td>
                     <td style="${TD} color: #ef5350;">${c || '-'}</td>
+                    <td style="${TD} color: #ff9800;">${de || '-'}</td>
                 </tr>`;
             });
             
@@ -1985,6 +1996,7 @@
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">PM</th>
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">${totalLabel}</th>
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">Cancelled</th>
+                            <th style="padding: 12px 16px; text-align: center; font-size: 13px;">Delivery Exception</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
                         <tfoot><tr style="background: rgba(102,126,234,0.15); font-weight: 700;">
@@ -1993,6 +2005,7 @@
                             <td style="padding: 12px 16px; text-align: center; color: #ff9800;">${numText(tPM, tPMc)}</td>
                             <td style="padding: 12px 16px; text-align: center;">${numText(tAll, tC)}</td>
                             <td style="padding: 12px 16px; text-align: center; color: #ef5350;">${tC || '-'}</td>
+                            <td style="padding: 12px 16px; text-align: center; color: #ff9800;">${tDE || '-'}</td>
                         </tr></tfoot>
                     </table>
                 </div>${LEGEND}`;
@@ -2002,9 +2015,10 @@
         function renderYearlyReport() {
             const byYear = {};
             reportRecords.forEach(r => {
-                if (!byYear[r.y]) byYear[r.y] = { AM: 0, PM: 0, cAM: 0, cPM: 0, y: r.y };
+                if (!byYear[r.y]) byYear[r.y] = { AM: 0, PM: 0, cAM: 0, cPM: 0, deAM: 0, dePM: 0, y: r.y };
                 byYear[r.y][r.period]++;
                 if (r.cancelled) byYear[r.y][r.period === 'AM' ? 'cAM' : 'cPM']++;
+                if (r.deliveryException) byYear[r.y][r.period === 'AM' ? 'deAM' : 'dePM']++;
             });
             const years = Object.values(byYear).sort((a, b) => b.y.localeCompare(a.y));
             if (years.length === 0) return '<div class="no-results">沒有訂單數據</div>';
@@ -2013,6 +2027,7 @@
             const tPM = years.reduce((s,x)=>s+x.PM,0);
             const tAMc = years.reduce((s,x)=>s+x.cAM,0);
             const tPMc = years.reduce((s,x)=>s+x.cPM,0);
+            const tDE = years.reduce((s,x)=>s+x.deAM+x.dePM,0);
             const tC = tAMc + tPMc;
             const tAll = tAM + tPM;
             
@@ -2020,12 +2035,14 @@
             years.forEach((x, idx) => {
                 const bg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
                 const c = x.cAM + x.cPM;
+                const de = x.deAM + x.dePM;
                 rows += `<tr style="background: ${bg};">
                     <td style="padding: 10px 16px; font-size: 14px;">${x.y}年</td>
                     <td style="${TD} color: #2196F3;">${numText(x.AM, x.cAM)}</td>
                     <td style="${TD} color: #ff9800;">${numText(x.PM, x.cPM)}</td>
                     <td style="${TD} font-weight: 600;">${numText(x.AM + x.PM, c)}</td>
                     <td style="${TD} color: #ef5350;">${c || '-'}</td>
+                    <td style="${TD} color: #ff9800;">${de || '-'}</td>
                 </tr>`;
             });
             
@@ -2038,6 +2055,7 @@
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">PM</th>
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">當年總計</th>
                             <th style="padding: 12px 16px; text-align: center; font-size: 13px;">Cancelled</th>
+                            <th style="padding: 12px 16px; text-align: center; font-size: 13px;">Delivery Exception</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
                         <tfoot><tr style="background: rgba(102,126,234,0.15); font-weight: 700;">
@@ -2046,6 +2064,7 @@
                             <td style="padding: 12px 16px; text-align: center; color: #ff9800;">${numText(tPM, tPMc)}</td>
                             <td style="padding: 12px 16px; text-align: center;">${numText(tAll, tC)}</td>
                             <td style="padding: 12px 16px; text-align: center; color: #ef5350;">${tC || '-'}</td>
+                            <td style="padding: 12px 16px; text-align: center; color: #ff9800;">${tDE || '-'}</td>
                         </tr></tfoot>
                     </table>
                 </div>${LEGEND}`;
