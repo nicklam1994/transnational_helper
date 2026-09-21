@@ -1731,7 +1731,8 @@
         const reportMonthMap = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
         const reportMonthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
         // 與訂單頁相同分類：這些狀態算「取消」
-        const CANCELLED_STATUSES = ['Cancelled', 'Exception', 'Delivery Exception'];
+        const CANCELLED_STATUSES = ['Cancelled', 'Exception', 'Delivery Exception'];  // 訂單詳情頁用
+        const REPORT_CANCELLED_STATUSES = ['Cancelled', 'Exception'];  // 報表用（Delivery Exception 算完成，要收錢）
         function isCancelled(r) { return CANCELLED_STATUSES.includes((r || '').trim()); }
         
         function pad2(n) { return String(n).padStart(2, '0'); }
@@ -1769,7 +1770,7 @@
                         d: match[1],
                         hour: parseInt(match[4]),
                         period: match[6],
-                        cancelled: isCancelled(order.Status)
+                        cancelled: REPORT_CANCELLED_STATUSES.includes((order.Status || '').trim())
                     });
                 });
                 
