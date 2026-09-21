@@ -975,17 +975,16 @@
                         <label class="ms-item"><input type="checkbox" value="Exception" onchange="statusChanged()"><span>Exception</span></label>
                     </div>
                 </div>
-                <input type="text" class="filter-select date-input" id="pickup-date-filter" placeholder="Pickup yyyy/mm/dd" autocomplete="off" oninput="formatDateInput(this)">
-                <select class="filter-select" id="pickup-time-filter">
+                <select class="filter-select" id="date-type-filter" onchange="updateTimeFilterLabel()">
+                    <option value="pickup">日期類型: Pickup Date</option>
+                    <option value="order">日期類型: Order Date</option>
+                </select>
+                <input type="text" class="filter-select date-input" id="date-start-filter" placeholder="起始 yyyy/mm/dd" autocomplete="off" oninput="formatDateInput(this)">
+                <input type="text" class="filter-select date-input" id="date-end-filter" placeholder="結束 yyyy/mm/dd" autocomplete="off" oninput="formatDateInput(this)">
+                <select class="filter-select" id="time-filter">
                     <option value="all">Pickup Time: 全部</option>
                     <option value="am">Pickup Time: AM (上午)</option>
                     <option value="pm">Pickup Time: PM (下午)</option>
-                </select>
-                <input type="text" class="filter-select date-input" id="order-date-filter" placeholder="Order yyyy/mm/dd" autocomplete="off" oninput="formatDateInput(this)">
-                <select class="filter-select" id="order-time-filter">
-                    <option value="all">Order Time: 全部</option>
-                    <option value="am">Order Time: AM (上午)</option>
-                    <option value="pm">Order Time: PM (下午)</option>
                 </select>
                 <button type="button" class="filter-clear-all" onclick="clearAllFilters()">✕ 清除全部</button>
             </div>
@@ -1362,10 +1361,10 @@
         
         // 搜索和過濾
         document.getElementById('search-box').addEventListener('input', filterOrders);
-        document.getElementById('pickup-date-filter').addEventListener('change', filterOrders);
-        document.getElementById('pickup-time-filter').addEventListener('change', filterOrders);
-        document.getElementById('order-date-filter').addEventListener('change', filterOrders);
-        document.getElementById('order-time-filter').addEventListener('change', filterOrders);
+        document.getElementById('date-type-filter').addEventListener('change', filterOrders);
+        document.getElementById('date-start-filter').addEventListener('change', filterOrders);
+        document.getElementById('date-end-filter').addEventListener('change', filterOrders);
+        document.getElementById('time-filter').addEventListener('change', filterOrders);
         
         // 點擊其他地方關閉多選面板
         document.addEventListener('click', function(e) {
@@ -1384,12 +1383,14 @@
             const btn = document.getElementById('status-ms-btn');
             btn.innerHTML = '狀態：全部 ▾';
             document.getElementById('status-ms-info').textContent = '';
-            // 日期
-            document.getElementById('pickup-date-filter').value = '';
-            document.getElementById('order-date-filter').value = '';
+            // 日期類型
+            document.getElementById('date-type-filter').value = 'pickup';
+            // 日期範圍
+            document.getElementById('date-start-filter').value = '';
+            document.getElementById('date-end-filter').value = '';
             // AM/PM 時間
-            document.getElementById('pickup-time-filter').value = 'all';
-            document.getElementById('order-time-filter').value = 'all';
+            document.getElementById('time-filter').value = 'all';
+            updateTimeFilterLabel();
             // 重新載入
             filterOrders();
         }
@@ -1452,10 +1453,10 @@
             // 狀態多選：收集勾選的狀態
             const statusChecks = document.querySelectorAll('#status-ms-panel input[type="checkbox"]:checked');
             const statusSet = new Set(Array.from(statusChecks).map(c => c.value));
-            const pickupDateFilter = document.getElementById('pickup-date-filter').value.replace(/\//g, '-');
-            const pickupTimeFilter = document.getElementById('pickup-time-filter').value;
-            const orderDateFilter = document.getElementById('order-date-filter').value.replace(/\//g, '-');
-            const orderTimeFilter = document.getElementById('order-time-filter').value;
+            const dateType = document.getElementById('date-type-filter').value;
+            const dateStartFilter = document.getElementById('date-start-filter').value.replace(/\//g, '-');
+            const dateEndFilter = document.getElementById('date-end-filter').value.replace(/\//g, '-');
+            const timeFilter = document.getElementById('time-filter').value;
             
             let filtered = allOrders;
             
@@ -1466,40 +1467,31 @@
                 });
             }
             
-            // Pickup Date 過濾
-            if (pickupDateFilter) {
+            // 日期範圍過濾
+            if (dateStartFilter || dateEndFilter) {
                 filtered = filtered.filter(order => {
-                    if (!order.PickupDate) return false;
-                    // 轉換日期格式：04/Sep/2026 -> 2026-09-04
-                    const dateStr = parseDate(order.PickupDate);
-                    return dateStr === pickupDateFilter;
+                    const dateField = dateType === 'pickup' ? order.PickupDate : order.OrderDate;
+                    if (!dateField) return false;
+                    const dateStr = parseDate(dateField);
+                    
+                    if (dateStartFilter && dateEndFilter) {
+                        return dateStr >= dateStartFilter && dateStr <= dateEndFilter;
+                    } else if (dateStartFilter) {
+                        return dateStr >= dateStartFilter;
+                    } else if (dateEndFilter) {
+                        return dateStr <= dateEndFilter;
+                    }
+                    return true;
                 });
             }
             
-            // Pickup Time 過濾 (AM/PM)
-            if (pickupTimeFilter !== 'all') {
+            // 時間過濾 (AM/PM) - 根據 dateType 決定篩選哪個時間
+            if (timeFilter !== 'all') {
                 filtered = filtered.filter(order => {
-                    if (!order.PickupTime) return false;
-                    const isPM = order.PickupTime.includes('PM');
-                    return pickupTimeFilter === 'pm' ? isPM : !isPM;
-                });
-            }
-            
-            // Order Date 過濾
-            if (orderDateFilter) {
-                filtered = filtered.filter(order => {
-                    if (!order.OrderDate) return false;
-                    const dateStr = parseDate(order.OrderDate);
-                    return dateStr === orderDateFilter;
-                });
-            }
-            
-            // Order Time 過濾 (AM/PM)
-            if (orderTimeFilter !== 'all') {
-                filtered = filtered.filter(order => {
-                    if (!order.OrderTime) return false;
-                    const isPM = order.OrderTime.includes('PM');
-                    return orderTimeFilter === 'pm' ? isPM : !isPM;
+                    const timeField = dateType === 'pickup' ? order.PickupTime : order.OrderTime;
+                    if (!timeField) return false;
+                    const isPM = timeField.includes('PM');
+                    return timeFilter === 'pm' ? isPM : !isPM;
                 });
             }
             
@@ -1517,6 +1509,25 @@
             
             renderOrders(filtered);
         }
+        function updateTimeFilterLabel() {
+            const dateType = document.getElementById('date-type-filter').value;
+            const timeFilter = document.getElementById('time-filter');
+            const options = timeFilter.options;
+            
+            if (dateType === 'pickup') {
+                options[0].text = 'Pickup Time: 全部';
+                options[1].text = 'Pickup Time: AM (上午)';
+                options[2].text = 'Pickup Time: PM (下午)';
+            } else {
+                options[0].text = 'Order Time: 全部';
+                options[1].text = 'Order Time: AM (上午)';
+                options[2].text = 'Order Time: PM (下午)';
+            }
+            
+            // 觸發篩選
+            filterOrders();
+        }
+
         
         // 日期格式轉換函數
         function parseDate(dateStr) {
