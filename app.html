@@ -1249,7 +1249,7 @@
             <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                 <button onclick="selectAllPrintOrders()" class="btn btn-secondary btn-sm">全選</button>
                 <button onclick="deselectAllPrintOrders()" class="btn btn-secondary btn-sm">取消全選</button>
-                <button onclick="printSelectedOrders()" class="btn btn-primary btn-sm">🖨️ 列印選中 (<span id="print-selected-count">0</span>)</button>
+                <button onclick="printSelectedOrders()" id="print-selected-btn" class="btn btn-primary btn-sm">🖨️ 列印選中 (<span id="print-selected-count">0</span>)</button>
             </div>
             
             <!-- 訂單列表 -->
@@ -1953,15 +1953,29 @@
                 return;
             }
             
-            const printer = localStorage.getItem('defaultPrinter') || 'ZD420';
-            const orderIds = Array.from(selectedOrderIds);
+            // 用「下拉框當前選擇」優先，其次已保存的預設機（避免選了卻沒生效）
+            const sel = document.getElementById('default-printer-select');
+            let printer = (sel && sel.value) ? sel.value : await resolvePrinter();
+            if (!printer) {
+                showToast('❌ 請先選擇打印機', 'err');
+                return;
+            }
+            if (sel && sel.value) localStorage.setItem('defaultPrinter', sel.value);
             
-            showToast(`正在列印 ${orderIds.length} 個訂單...`, 'ok');
+            const orderIds = Array.from(selectedOrderIds);
+            const btn = document.getElementById('print-selected-btn');
+            const origText = btn ? btn.innerHTML : '';
             
             let successCount = 0;
             let failCount = 0;
+            const errors = [];
             
-            for (const invoiceId of orderIds) {
+            for (let i = 0; i < orderIds.length; i++) {
+                const invoiceId = orderIds[i];
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = `⏳ 列印中 ${i + 1}/${orderIds.length}...`;
+                }
                 try {
                     const response = await fetch('/api/print-waybill', {
                         method: 'POST',
@@ -1974,21 +1988,33 @@
                         successCount++;
                     } else {
                         failCount++;
+                        errors.push(data.error || '未知錯誤');
                         console.error('列印失敗:', data.error);
                     }
                 } catch (e) {
                     failCount++;
+                    errors.push(e.message);
                     console.error('列印錯誤:', e);
                 }
                 
                 // 每個訂單之間延遲 1 秒，避免過快
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (i < orderIds.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+            
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origText;
             }
             
             if (failCount === 0) {
-                showToast(`✅ 成功列印 ${successCount} 個訂單`, 'ok');
+                showToast(`✅ 成功列印 ${successCount} 個訂單 → ${printer}`, 'ok');
+                selectedOrderIds.clear();
+                updateSelectedCount();
+                renderPrintOrdersList(printPageOrders);
             } else {
-                showToast(`⚠️ 成功 ${successCount} 個，失敗 ${failCount} 個`, 'err');
+                showToast(`⚠️ 成功 ${successCount}，失敗 ${failCount}：${errors[0] || ''}`, 'err');
             }
         }
 
