@@ -368,11 +368,11 @@ def print_waybill():
                             "本機直印需要 pywin32 與 Pillow，請執行 pip install pywin32 pillow（詳情：" + GDI_ERR + "）"}), 500
         try:
             with _PRINT_LOCK:
-                sent_pages = print_pdf_via_gdi(merged_pdf, printer_name, dpi=GDI_DPI,
-                                               doc_name='Waybill ' + str(order_no))
+                sent_pages, gdi_info = print_pdf_via_gdi(
+                    merged_pdf, printer_name, doc_name='Waybill ' + str(order_no))
         except Exception as e:
             return jsonify({"success": False, "error": "GDI 送印失敗：" + str(e)}), 500
-        print("[print] → GDI 直印 %r %d 頁" % (printer_name, sent_pages), flush=True)
+        print("[print] → GDI 直印 %r %d 頁 %s" % (printer_name, sent_pages, gdi_info), flush=True)
 
         return jsonify({
             "success": True,
@@ -380,7 +380,7 @@ def print_waybill():
             "order_no": order_no,
             "mode": print_mode,
             "build": label_build,
-            "send_method": "GDI 直印 %s（%d 頁 / %ddpi）" % (printer_name, sent_pages, GDI_DPI)
+            "send_method": "GDI 直印 %s（%d 頁 / %s）" % (printer_name, sent_pages, gdi_info)
         })
     except Exception as e:
         import traceback
@@ -408,7 +408,19 @@ def _printer_ip(printer_name):
     return None
 
 
-def build_zpl_from_pdf(pdf_bytes, width_mm=102, height_mm=210, dpmm=8, threshold=128):
+# 黑白二值化門檻（GDI 直印與 ZPL 直送共用同一個值，兩條路徑輸出一致）
+#   2026-09-21 實測定案：舊值 128 會把標籤上「非純黑」的內容全部刪掉 ——
+#     · Transnational logo：灰階 96~249（平均 169）→ 整塊消失
+#     · 灰色分區色帶（灰階 165）：整條消失，連帶其上「COLLECT FROM」反白字也不見
+#     · 全頁墨點被砍掉 55.3%
+#   門檻 200 的實測結果：
+#     · logo 完整回來、灰帶變成「實心黑底 + 白色反白字」（符合原設計意圖，且熱感機不會有灰階抖動）
+#     · 孤立雜點由 41 個降到 4 個（門檻越高，文字邊緣的灰階反而與字身連成一片，不會散成點）
+#     · 只砍掉 10.5% 墨點，細小文字不會被填糊（235 會過度加粗，不採用）
+INK_THRESHOLD = 200
+
+
+def build_zpl_from_pdf(pdf_bytes, width_mm=102, height_mm=210, dpmm=8, threshold=INK_THRESHOLD):
     """把 PDF 每一頁點陣化成 1-bit 並轉成 ZPL（^GFA 點陣圖）。
 
     完全不依賴任何 PDF 閱讀程式或 Windows 驅動，任何電腦都能用。
@@ -520,12 +532,11 @@ def build_label_pdf_legacy(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM)
 
 
 
-GDI_DPI = 300
 _PRINT_LOCK = threading.Lock()
 
 
-def print_pdf_via_gdi(pdf_bytes, printer_name, dpi=GDI_DPI, doc_name='Waybill'):
-    """PyMuPDF 點陣化 → pywin32 GDI 直接列印。回傳實際送出的頁數。
+def print_pdf_via_gdi(pdf_bytes, printer_name, doc_name='Waybill', threshold=INK_THRESHOLD):
+    """PyMuPDF 點陣化 → pywin32 GDI 直接列印。回傳 (頁數, 說明字串)。
 
     為何用這條路（2026-09-21 實測定案，已完全取代 PDF 閱讀程式路徑）：
       - GDI：無外部程式、無對話框、1 頁約 0.4 秒，批量連送全部進佇列（實測零遺失）。
@@ -533,10 +544,23 @@ def print_pdf_via_gdi(pdf_bytes, printer_name, dpi=GDI_DPI, doc_name='Waybill'):
         曾害程式誤判失敗又送一次（快速列印印出 4 張）；ShellExecute `-Verb PrintTo`
         不會把印表機名傳進 PDF 程式，會彈窗且掉工作。
     EndDoc 會等 spooler 收下工作，所以回傳成功 = 真的進佇列。
+
+    ★ 熱感標籤機「印出一堆點點點」的修正（2026-09-21）：
+      ZD420 的驅動 DC 實測是 1-bit 單色、原生 203dpi、畫布 815x1678。
+      舊寫法用 300dpi「彩色 RGB」點陣圖再 StretchBlt 縮到 815x1678，兩個問題同時發生：
+        ① 300→203dpi 最近鄰降採樣，把細線與文字邊緣打散成散點
+        ② GDI 把彩色轉 1bpp 時會做抖動（dithering）→ 整片點點點
+      現在改成「依 DC 實測規格送圖」：
+        ① 以印表機原生解析度點陣化，尺寸與畫布 1:1 → 完全不做二次縮放
+        ② DC 是 1-bit 就先硬門檻二值化再送 → 沒有灰階，驅動無從抖動
+      另外門檻值本身也曾出錯（128 會刪掉 logo 與灰色色帶）：見 INK_THRESHOLD 說明。
+      （A4 的 HP 驅動 DC 是 8-bit 灰階 / 600dpi，維持灰階直送即可，不二值化。）
+
+    呼叫端需以 _PRINT_LOCK 序列化（GDI 對同一印表機非執行緒安全）。
     """
     import io
     import fitz
-    import win32print, win32ui, win32con
+    import win32ui, win32con
     from PIL import Image, ImageWin
 
     doc = fitz.open(stream=pdf_bytes, filetype='pdf')
@@ -545,25 +569,30 @@ def print_pdf_via_gdi(pdf_bytes, printer_name, dpi=GDI_DPI, doc_name='Waybill'):
     try:
         pw = hdc.GetDeviceCaps(win32con.HORZRES)      # 可列印區寬（裝置像素）
         ph = hdc.GetDeviceCaps(win32con.VERTRES)      # 可列印區高
+        nat_dpi = hdc.GetDeviceCaps(win32con.LOGPIXELSX) or 300
+        mono = hdc.GetDeviceCaps(win32con.BITSPIXEL) == 1
         hdc.StartDoc(doc_name)
         pages = 0
         for page in doc:
-            pix = page.get_pixmap(dpi=dpi, colorspace=fitz.csRGB, alpha=False)
-            im = Image.open(io.BytesIO(pix.tobytes('png')))
-            ratio = min(pw / im.width, ph / im.height)
-            w = max(1, int(im.width * ratio))
-            h = max(1, int(im.height * ratio))
-            x0 = (pw - w) // 2
-            y0 = (ph - h) // 2
+            rect = page.rect
+            # 整頁對映到恰好 pw x ph 個裝置像素 → 就是原生解析度，之後不再縮放
+            mat = fitz.Matrix(pw / rect.width, ph / rect.height)
+            pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY, alpha=False)
+            im = Image.frombytes('L', (pix.width, pix.height), pix.samples)
+            if im.size != (pw, ph):
+                im = im.resize((pw, ph), Image.LANCZOS)
+            if mono:
+                # 硬門檻二值化（明確關閉抖動）→ 送出的就是最終黑點，驅動無從加噪
+                im = im.point(lambda v: 255 if v >= threshold else 0)
+                im = im.convert('1', dither=getattr(getattr(Image, 'Dither', Image), 'NONE', 0))
             hdc.StartPage()
-            ImageWin.Dib(im).draw(hdc.GetHandleOutput(), (x0, y0, x0 + w, y0 + h))
+            ImageWin.Dib(im).draw(hdc.GetHandleOutput(), (0, 0, pw, ph))
             hdc.EndPage()
             pages += 1
         hdc.EndDoc()
-        return pages
+        return pages, '原生 %ddpi %s' % (nat_dpi, '1-bit 二值化' if mono else '8-bit 灰階')
     finally:
         hdc.DeleteDC()
-
 
 @app.route('/api/order-detail', methods=['POST'])
 def order_detail():
