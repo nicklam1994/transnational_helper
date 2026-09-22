@@ -194,10 +194,19 @@ def print_waybill():
     
     data = request.json or {}
     invoice_id = data.get('InvoiceId')
-    printer_name = data.get('printer', 'ZD420')
-    
+    printer_name = (data.get('printer') or '').strip()
+    # channel: auto（先 PDF 再 ZPL）| pdf（只走 PDF 處理程式）| zpl（只用 ZPL 直送，不需印表機名）
+    channel = str(data.get('channel') or 'auto').lower()
+    zpl_ip_req = (data.get('zpl_ip') or '').strip()
+    try:
+        zpl_port_req = int(data.get('zpl_port') or 9100)
+    except Exception:
+        zpl_port_req = 9100
+
     if not invoice_id:
         return jsonify({"success": False, "error": "缺少 InvoiceId"}), 400
+    if not printer_name and channel != 'zpl':
+        return jsonify({"success": False, "error": "缺少 printer 參數（列印機）"}), 400
     
     if not PDF_LIB_OK:
         return jsonify({
@@ -205,8 +214,10 @@ def print_waybill():
             "error": "伺服器缺少 PyPDF2，無法處理列印。請執行 pip install PyPDF2 後重啟（詳情：" + PDF_LIB_ERR + "）"
         }), 500
     
-    # 判斷是否為標籤打印機
-    is_label_printer = 'ZD' in printer_name.upper() or 'LABEL' in printer_name.upper()
+    # 判斷是否為標籤打印機（channel=zpl 時一律視為標籤模式）
+    is_label_printer = ('ZD' in printer_name.upper()
+                        or 'LABEL' in printer_name.upper()
+                        or channel == 'zpl')
     
     try:
         # 1. 獲取訂單詳情
@@ -290,8 +301,8 @@ def print_waybill():
                 "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo')
             }
             if is_label_printer:
-                ip = _printer_ip(printer_name)
-                info['zpl_target'] = (ip + ':9100') if ip else None
+                ip = zpl_ip_req or _printer_ip(printer_name)
+                info['zpl_target'] = (ip + ':' + str(zpl_port_req)) if ip else None
                 if ip and ZPL_OK:
                     try:
                         info['zpl_bytes'] = len(build_zpl_from_pdf(merged_pdf))
@@ -304,7 +315,6 @@ def print_waybill():
         # 送印順序（用戶指定）：**PDF 處理程式（Adobe Reader）/h /t 為首選**，
         # A4 與標籤都用它；**ZPL 直送作為標籤機的備選**。
         # channel 可強制指定：auto（預設，先 PDF 再 ZPL）| pdf | zpl
-        channel = str(data.get('channel') or 'auto').lower()
         pdf_err = ''
         zpl_err = ''
 
@@ -343,25 +353,25 @@ def print_waybill():
             if channel == 'pdf':
                 return jsonify({"success": False, "error": "送印失敗：" + pdf_err}), 500
 
-        # 5b. 備選（僅標籤機）：自己把 PDF 點陣化成 ZPL，直送印表機 9100 埠
+        # 5b. 備選（僅標籤機）：自己把 PDF 點陣化成 ZPL，直送印表機 raw 埠（預設 9100）
         if is_label_printer:
-            ip = _printer_ip(printer_name)
+            ip = zpl_ip_req or _printer_ip(printer_name)
             if not ip:
-                zpl_err = '無法取得印表機 IP'
+                zpl_err = '無法取得印表機 IP（請在設定頁填寫）'
             elif not ZPL_OK:
                 zpl_err = 'PyMuPDF 不可用'
             else:
                 try:
                     zpl = build_zpl_from_pdf(merged_pdf)
-                    send_zpl_via_tcp(zpl, ip)
+                    send_zpl_via_tcp(zpl, ip, zpl_port_req)
                     note = ('；PDF 送印失敗：' + pdf_err) if pdf_err else ''
                     return jsonify({
                         "success": True,
-                        "message": f"已直送 {printer_name} ({print_mode}){note}",
+                        "message": f"已直送 {printer_name or ip} ({print_mode}){note}",
                         "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
                         "mode": print_mode,
                         "build": label_build,
-                        "send_method": f"ZPL 直送 {ip}:9100 ({len(zpl)} bytes){note}"
+                        "send_method": f"ZPL 直送 {ip}:{zpl_port_req} ({len(zpl)} bytes){note}"
                     })
                 except Exception as e:
                     zpl_err = str(e)

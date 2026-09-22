@@ -894,6 +894,100 @@
             justify-content: flex-end;
             margin-top: 25px;
         }
+        /* ===== 設定頁 ===== */
+        .settings-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+        }
+        .settings-card-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; padding: 8px 0; flex-wrap: wrap;
+        }
+        .settings-row label { font-size: 14px; color: #cfd3e8; }
+        .settings-select, .settings-input {
+            padding: 8px 12px; background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+            color: #fff; font-size: 14px; min-width: 260px;
+        }
+        .settings-select option { background: #1a1a2e; color: #fff; }
+        .settings-input { min-width: 170px; }
+        .settings-hint { font-size: 12px; color: #8b90ab; margin-top: 6px; line-height: 1.6; }
+        .settings-actions { display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+        .settings-sub { font-size: 13px; color: #8b90ab; margin: 14px 0 4px; }
+
+        /* 開關 */
+        .switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: rgba(255,255,255,0.2); border-radius: 26px; transition: .2s;
+        }
+        .switch .slider:before {
+            content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+            background: #fff; border-radius: 50%; transition: .2s;
+        }
+        .switch input:checked + .slider { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .switch input:checked + .slider:before { transform: translateX(22px); }
+
+        /* ===== 淺色模式（body.light）=====
+           註：app 內大量使用行內深色樣式，這裡用屬性選擇器一併覆寫。 */
+        body.light { background: #f4f5fa; color: #1c1f2b; }
+        body.light .sidebar { background: rgba(255,255,255,0.92); border-right: 1px solid rgba(0,0,0,0.08); }
+        body.light .sidebar-logo { border-bottom-color: rgba(0,0,0,0.08); }
+        body.light .sidebar-logo p,
+        body.light .conn-status,
+        body.light .settings-hint,
+        body.light .page-subtitle { color: #6b7280; }
+        body.light .nav-item:hover { background: rgba(0,0,0,0.04); }
+        body.light .nav-item.active { background: rgba(102,126,234,0.12); }
+        body.light .detail-label,
+        body.light .settings-sub { color: #6b7280; }
+        body.light .settings-row label { color: #374151; }
+        /* 容器／卡片（含行內深色底） */
+        body.light .settings-card,
+        body.light .order-card,
+        body.light .stat-card,
+        body.light .ms-panel,
+        body.light .modal-content,
+        body.light .confirm-box { background: #fff; }
+        body.light [style*="rgba(255,255,255,0.05)"],
+        body.light [style*="rgba(255, 255, 255, 0.05)"] { background: #ffffff !important; }
+        body.light [style*="rgba(255,255,255,0.02)"],
+        body.light [style*="rgba(255, 255, 255, 0.02)"] { background: #fafbff !important; }
+        body.light [style*="rgba(255,255,255,0.1)"],
+        body.light [style*="rgba(255, 255, 255, 0.1)"] { background: rgba(0,0,0,0.05) !important; }
+        body.light [style*="rgba(255,255,255,0.15)"],
+        body.light [style*="rgba(255, 255, 255, 0.15)"] { background: rgba(0,0,0,0.07) !important; }
+        body.light [style*="rgba(102,126,234,0.2)"],
+        body.light [style*="rgba(102, 126, 234, 0.2)"] { background: rgba(102,126,234,0.15) !important; }
+        /* 文字：行內白字改深字（按鈕除外，按鈕多為漸層底） */
+        body.light [style*="color: #fff"]:not(button):not(.btn),
+        body.light [style*="color:#fff"]:not(button):not(.btn),
+        body.light [style*="color: #ffffff"]:not(button):not(.btn) { color: #1c1f2b !important; }
+        body.light [style*="color: #ccc"] { color: #4b5563 !important; }
+        body.light [style*="color: #a0a0a0"] { color: #6b7280 !important; }
+        /* 表單控件 */
+        body.light .settings-select, body.light .settings-input,
+        body.light .search-box, body.light .filter-select {
+            background: #fff; border-color: rgba(0,0,0,0.15); color: #1c1f2b;
+        }
+        body.light select option { background: #fff; color: #1c1f2b; }
+        body.light .date-input::placeholder,
+        body.light .search-box::placeholder { color: rgba(0,0,0,0.4); }
+        body.light .orders-grid .order-info div { color: #374151; }
+        body.light .ms-item { color: #1c1f2b; }
+        body.light table td, body.light table th { color: #1c1f2b; }
+        body.light .filter-clear-all {
+            color: #c62828 !important;
+            background: rgba(198,40,40,0.08);
+            border-color: rgba(198,40,40,0.35);
+        }
+        body.light .stat-label { color: #6b7280; }
+        body.light .stat-value { color: #1c1f2b; }
+        body.light .order-id, body.light .page-title { color: #1c1f2b; }
     </style>
 </head>
 <body>
@@ -927,6 +1021,13 @@
             <div class="nav-item" onclick="switchPage('address')">
                 <span class="nav-icon">📍</span>
                 <span class="nav-text">地址管理</span>
+            </div>
+        </div>
+        <!-- 左下角：設定（齒輪） -->
+        <div class="nav-menu" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+            <div class="nav-item" onclick="switchPage('settings')">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-text">設定</span>
             </div>
         </div>
     </div>
@@ -1226,18 +1327,18 @@
             <h2 class="page-title">🖨️ 運單列印</h2>
             <p class="page-subtitle">搜索訂單並批量列印運單</p>
             
-            <!-- 打印機設置 -->
-            <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <label style="color: #a0a0a0; font-size: 14px;">默認打印機：</label>
-                        <select id="default-printer-select" style="padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; min-width: 250px;">
-                            <option value="" style="background: #1a1a2e; color: #fff;">載入中...</option>
-                        </select>
-                        <button onclick="loadPrintersForPrintPage()" style="padding: 6px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; cursor: pointer;" title="刷新打印機列表">🔄</button>
-                    </div>
-                    <button onclick="saveDefaultPrinter()" class="btn btn-primary" style="padding: 8px 16px;">💾 保存為默認</button>
+            <!-- 列印選項 -->
+            <div class="settings-card">
+                <div class="settings-card-title">🖨️ 列印選項</div>
+                <div class="settings-row">
+                    <label>列印方式</label>
+                    <select id="print-mode-select" class="settings-select" onchange="updatePrintModeHint()">
+                        <option value="a4">原單 (A4)</option>
+                        <option value="label" selected>標籤機</option>
+                        <option value="label-zpl">標簽機 (ZPL)</option>
+                    </select>
                 </div>
+                <div class="settings-hint" id="print-mode-hint">載入中…</div>
             </div>
             
             <!-- 搜索區域 -->
@@ -1258,6 +1359,64 @@
                 <p>載入訂單中...</p>
             </div>
             <div id="print-orders-list" style="margin-top: 20px;"></div>
+        </div>
+        
+        <!-- 設定頁面 -->
+        <div id="settings-page" class="page">
+            <h2 class="page-title">⚙️ 設定</h2>
+            <p class="page-subtitle">外觀與列印設定</p>
+            
+            <!-- 外觀 -->
+            <div class="settings-card">
+                <div class="settings-card-title">🎨 外觀</div>
+                <div class="settings-row">
+                    <label>Dark mode（深色模式）</label>
+                    <label class="switch">
+                        <input type="checkbox" id="dark-mode-toggle" onchange="applyDarkMode(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- 本地打印機 -->
+            <div class="settings-card">
+                <div class="settings-card-title">🖨️ 本地打印機</div>
+                <div class="settings-row">
+                    <label>原始運單打印機 (A4)</label>
+                    <select id="set-a4-printer" class="settings-select">
+                        <option value="">（未設定）</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label>標籤運單打印機 (Label)</label>
+                    <select id="set-label-printer" class="settings-select">
+                        <option value="">（未設定）</option>
+                    </select>
+                </div>
+                <div class="settings-hint">走 Windows 驅動：Adobe Reader <code>/h /t</code> 靜默送印，可指定印表機。</div>
+                <div class="settings-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="reloadPrintersInSettings()">🔄 重新載入打印機清單</button>
+                </div>
+            </div>
+            
+            <!-- 網絡 (IP) -->
+            <div class="settings-card">
+                <div class="settings-card-title">🌐 網絡 (IP) — ZPL 直通</div>
+                <div class="settings-row">
+                    <label>標籤機 IP</label>
+                    <input type="text" id="set-zpl-ip" class="settings-input" placeholder="192.168.168.251">
+                </div>
+                <div class="settings-row">
+                    <label>埠 Port</label>
+                    <input type="text" id="set-zpl-port" class="settings-input" placeholder="9100" value="9100">
+                </div>
+                <div class="settings-hint">不經 Windows 驅動，直接把 ZPL 送到印表機 raw 埠（預設 9100）。</div>
+            </div>
+            
+            <div class="settings-actions">
+                <button class="btn btn-primary btn-sm" onclick="saveSettings()">💾 儲存設定</button>
+                <span class="settings-hint" id="settings-saved-hint"></span>
+            </div>
         </div>
         
     <script>
@@ -1286,11 +1445,16 @@
                 document.getElementById('address-page').classList.add('active');
                 document.querySelectorAll('.nav-item')[4].classList.add('active');
                 loadAddresses();
+            } else if (page === 'settings') {
+                document.getElementById('settings-page').classList.add('active');
+                document.querySelectorAll('.nav-item')[5].classList.add('active');
+                loadSettingsPage();
             }
         }
         
         // 載入所有訂單
-        async function loadOrders() {
+        let ordersRetryTimer = null;
+        async function loadOrders(autoRetry) {
             const loading = document.getElementById('orders-loading');
             loading.classList.add('active');
             
@@ -1302,6 +1466,23 @@
                     allOrders = data.orders;
                     updateStats();
                     renderOrders(allOrders);
+                    if (ordersRetryTimer) { clearTimeout(ordersRetryTimer); ordersRetryTimer = null; }
+                    return;
+                }
+                
+                // 失敗（最常見：token 過期／未登入）→ 顯示明確提示並自動重試
+                const msg = data.error || '載入失敗';
+                const needLogin = /token|登入|keepalive/i.test(msg);
+                document.getElementById('orders-grid').innerHTML =
+                    '<div class="no-results">⚠ ' + msg +
+                    (needLogin
+                        ? '<br><br>請在 Edge 視窗登入 teamwork（keepalive 會自動接手 token）；<br>登入後本頁會自動重新載入，不需手動重整。'
+                        : '') + '</div>';
+                if (needLogin && !ordersRetryTimer) {
+                    ordersRetryTimer = setTimeout(function () {
+                        ordersRetryTimer = null;
+                        loadOrders(true);
+                    }, 10000);
                 }
             } catch (error) {
                 console.error('載入訂單失敗:', error);
@@ -1644,120 +1825,164 @@
         }
         
 
-        // 打印機管理
+        // ===== 設定（外觀 + 列印）=====
         let allPrinters = [];
-        
-        function loadPrinters() {
-            fetch('/api/printers')
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.success) return;
-                    allPrinters = data.printers || [];
-                    
-                    // 更新訂單詳情頁的打印機選擇器
-                    const sel = document.getElementById('printer-select');
-                    if (sel) {
-                        sel.innerHTML = '';
-                        allPrinters.forEach(p => {
-                            const opt = document.createElement('option');
-                            opt.value = p.name;
-                            opt.textContent = p.name + (p.port ? ' (' + p.port + ')' : '');
-                            sel.appendChild(opt);
-                        });
-                        // 默認選 ZD420
-                        for (let o of sel.options) {
-                            if (o.value.includes('ZD420')) { sel.value = o.value; break; }
-                        }
-                    }
-                })
-                .catch(e => console.error('載入打印機失敗:', e));
-        }
-        
-        // 預設打印機：自動挑一台 ZD 標籤機並記住（避免用到不存在的 'ZD420' 名稱）
-        async function initDefaultPrinter() {
-            const saved = localStorage.getItem('defaultPrinter');
-            if (saved) {
-                try {
-                    const r = await fetch('/api/printers');
-                    const d = await r.json();
-                    if (d.success && (d.printers || []).some(p => p.name === saved)) return;
-                } catch (e) { return; }
+        const SETTINGS_KEY = 'dhSettings';
+
+        function getSettings() {
+            try {
+                const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+                return {
+                    darkMode: s.darkMode !== false,               // 預設深色
+                    a4Printer: s.a4Printer || '',
+                    labelPrinter: s.labelPrinter || '',
+                    zplIp: s.zplIp || '',
+                    zplPort: String(s.zplPort || '9100')
+                };
+            } catch (e) {
+                return { darkMode: true, a4Printer: '', labelPrinter: '', zplIp: '', zplPort: '9100' };
             }
+        }
+
+        function applyDarkMode(on) {
+            document.body.classList.toggle('light', !on);
+            const t = document.getElementById('dark-mode-toggle');
+            if (t) t.checked = !!on;
+        }
+
+        async function fetchPrinterNames() {
             try {
                 const r = await fetch('/api/printers');
                 const d = await r.json();
-                if (d.success && (d.printers || []).length) {
-                    const pick = d.printers.find(p => /ZD/i.test(p.name)) || d.printers[0];
-                    localStorage.setItem('defaultPrinter', pick.name);
-                    console.log('已設定預設打印機:', pick.name);
+                allPrinters = d.success ? (d.printers || []) : [];
+                return allPrinters.map(p => p.name);
+            } catch (e) {
+                console.error('載入打印機失敗:', e);
+                return [];
+            }
+        }
+
+        // 啟動時載入設定；印表機沒設定或已不存在就自動挑一台合理的
+        async function loadAppSettings() {
+            const s = getSettings();
+            applyDarkMode(s.darkMode);
+            const names = await fetchPrinterNames();
+            let changed = false;
+            if (names.length) {
+                if (!s.labelPrinter || !names.includes(s.labelPrinter)) {
+                    const pick = names.find(n => /ZD/i.test(n)) || '';
+                    if (pick !== s.labelPrinter) { s.labelPrinter = pick; changed = true; }
                 }
-            } catch (e) { console.error('初始化打印機失敗:', e); }
-        }
-        
-        function loadPrintersForPrintPage() {
-            fetch('/api/printers')
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.success) return;
-                    allPrinters = data.printers || [];
-                    
-                    const sel = document.getElementById('default-printer-select');
-                    if (sel) {
-                        sel.innerHTML = '';
-                        allPrinters.forEach(p => {
-                            const opt = document.createElement('option');
-                            opt.value = p.name;
-                            opt.textContent = p.name + (p.port ? ' (' + p.port + ')' : '');
-                            opt.style.background = '#1a1a2e';
-                            opt.style.color = '#fff';
-                            sel.appendChild(opt);
-                        });
-                        
-                        // 載入保存的默認打印機
-                        const savedPrinter = localStorage.getItem('defaultPrinter');
-                        if (savedPrinter) {
-                            sel.value = savedPrinter;
-                        } else {
-                            // 默認選 ZD420
-                            for (let o of sel.options) {
-                                if (o.value.includes('ZD420')) { sel.value = o.value; break; }
-                            }
-                        }
-                    }
-                })
-                .catch(e => console.error('載入打印機失敗:', e));
-        }
-        
-        function saveDefaultPrinter() {
-            const sel = document.getElementById('default-printer-select');
-            if (sel && sel.value) {
-                localStorage.setItem('defaultPrinter', sel.value);
-                showToast('✅ 已保存默認打印機', 'ok');
+                if (!s.a4Printer || !names.includes(s.a4Printer)) {
+                    const pick = names.find(n => !/ZD/i.test(n) && !/PDF|OneNote/i.test(n)) || '';
+                    if (pick !== s.a4Printer) { s.a4Printer = pick; changed = true; }
+                }
             }
-        }
-        
-        // 解析預設打印機（沒有就自動挑一台）
-        async function resolvePrinter() {
-            let p = localStorage.getItem('defaultPrinter');
-            if (!p) {
-                await initDefaultPrinter();
-                p = localStorage.getItem('defaultPrinter');
+            if (!s.zplIp && s.labelPrinter) {
+                const m = s.labelPrinter.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+                if (m) { s.zplIp = m[1]; changed = true; }
             }
-            return p;
+            if (changed) localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+            updatePrintModeHint();
+            console.log('設定載入完成:', JSON.stringify(getSettings()));
+        }
+
+        function fillPrinterSelect(id, selected) {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            sel.innerHTML = '<option value="">（未設定）</option>';
+            allPrinters.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = p.name + (p.port ? ' (' + p.port + ')' : '');
+                opt.style.background = '#1a1a2e';
+                opt.style.color = '#fff';
+                sel.appendChild(opt);
+            });
+            sel.value = selected || '';
+        }
+
+        async function loadSettingsPage() {
+            const s = getSettings();
+            applyDarkMode(s.darkMode);
+            await fetchPrinterNames();
+            fillPrinterSelect('set-a4-printer', s.a4Printer);
+            fillPrinterSelect('set-label-printer', s.labelPrinter);
+            document.getElementById('set-zpl-ip').value = s.zplIp || '';
+            document.getElementById('set-zpl-port').value = s.zplPort || '9100';
+            document.getElementById('settings-saved-hint').textContent = '';
+        }
+
+        async function reloadPrintersInSettings() {
+            await fetchPrinterNames();
+            const s = getSettings();
+            fillPrinterSelect('set-a4-printer', s.a4Printer);
+            fillPrinterSelect('set-label-printer', s.labelPrinter);
+            showToast('✅ 已重新載入 ' + allPrinters.length + ' 台打印機', 'ok');
+        }
+
+        function saveSettings() {
+            const s = getSettings();
+            s.a4Printer = document.getElementById('set-a4-printer').value;
+            s.labelPrinter = document.getElementById('set-label-printer').value;
+            s.zplIp = document.getElementById('set-zpl-ip').value.trim();
+            s.zplPort = document.getElementById('set-zpl-port').value.trim() || '9100';
+            s.darkMode = document.getElementById('dark-mode-toggle').checked;
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+            applyDarkMode(s.darkMode);
+            document.getElementById('settings-saved-hint').textContent = '已儲存 ✓';
+            updatePrintModeHint();
+            showToast('✅ 設定已儲存', 'ok');
+        }
+
+        // 依「列印選項」+ 設定，解析實際要用的印表機／通道
+        function getPrintTarget() {
+            const s = getSettings();
+            const sel = document.getElementById('print-mode-select');
+            const mode = sel ? sel.value : 'label';
+            if (mode === 'a4') {
+                return { mode: 'a4', printer: s.a4Printer, channel: 'pdf', label: '原單 (A4)' };
+            }
+            if (mode === 'label-zpl') {
+                return { mode: 'label-zpl', printer: s.labelPrinter, channel: 'zpl',
+                         zplIp: s.zplIp, zplPort: s.zplPort, label: '標簽機 (ZPL)' };
+            }
+            return { mode: 'label', printer: s.labelPrinter, channel: 'pdf', label: '標籤機' };
+        }
+
+        function updatePrintModeHint() {
+            const el = document.getElementById('print-mode-hint');
+            if (!el) return;
+            const s = getSettings();
+            const t = getPrintTarget();
+            let txt;
+            if (t.mode === 'a4') {
+                txt = '印表機：' + (s.a4Printer || '（未設定 → 請到左下「設定」選擇）')
+                    + ' — 走 Windows 驅動，原始 A4 運單一張';
+            } else if (t.mode === 'label-zpl') {
+                txt = 'ZPL 直送 ' + (s.zplIp || '（未設定 IP → 請到左下「設定」填寫）')
+                    + ':' + (s.zplPort || '9100') + ' — 不經 Windows 驅動';
+            } else {
+                txt = '印表機：' + (s.labelPrinter || '（未設定 → 請到左下「設定」選擇）')
+                    + ' — 走 Windows 驅動，102x210 兩張';
+            }
+            el.textContent = txt;
         }
         
         async function printWaybill(invoiceId, printerName) {
-            // 如果沒有指定打印機，使用默認打印機
-            const printer = printerName || await resolvePrinter();
-            if (!printer) {
-                showToast('❌ 請先在「運單列印」設定預設打印機', 'err');
+            // 依「列印選項」+ 設定決定印表機與通道
+            const t = getPrintTarget();
+            const printer = printerName || t.printer;
+            if (t.channel !== 'zpl' && !printer) {
+                showToast('❌ 請先到左下「設定」選擇打印機', 'err');
                 return;
             }
             
             fetch('/api/print-waybill', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ InvoiceId: invoiceId, printer: printer })
+                body: JSON.stringify({ InvoiceId: invoiceId, printer: printer, channel: t.channel,
+                                       zpl_ip: t.zplIp, zpl_port: t.zplPort })
             })
             .then(r => r.json())
             .then(data => {
@@ -1771,10 +1996,11 @@
         }
         
         async function quickPrintWaybill(invoiceId, button) {
-            // 快速列印 - 使用默認打印機
-            const printer = await resolvePrinter();
+            // 快速列印 = 標籤運單打印機（走 Windows 驅動，102x210 兩張）
+            const s = getSettings();
+            const printer = s.labelPrinter;
             if (!printer) {
-                showToast('❌ 請先在「運單列印」設定預設打印機', 'err');
+                showToast('❌ 請先到左下「設定」選擇標籤運單打印機', 'err');
                 return;
             }
             const originalText = button.innerHTML;
@@ -1785,7 +2011,7 @@
             fetch('/api/print-waybill', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ InvoiceId: invoiceId, printer: printer })
+                body: JSON.stringify({ InvoiceId: invoiceId, printer: printer, channel: 'pdf' })
             })
             .then(r => r.json())
             .then(data => {
@@ -1807,7 +2033,7 @@
         let selectedOrderIds = new Set();
         
         function loadPrintPage() {
-            loadPrintersForPrintPage();
+            updatePrintModeHint();
             // 載入所有訂單
             fetch('/api/orders')
                 .then(r => r.json())
@@ -1953,14 +2179,13 @@
                 return;
             }
             
-            // 用「下拉框當前選擇」優先，其次已保存的預設機（避免選了卻沒生效）
-            const sel = document.getElementById('default-printer-select');
-            let printer = (sel && sel.value) ? sel.value : await resolvePrinter();
-            if (!printer) {
-                showToast('❌ 請先選擇打印機', 'err');
+            // 依「列印選項」+ 設定決定印表機與通道
+            const t2 = getPrintTarget();
+            const printer = t2.printer;
+            if (t2.channel !== 'zpl' && !printer) {
+                showToast('❌ 請先到左下「設定」選擇打印機', 'err');
                 return;
             }
-            if (sel && sel.value) localStorage.setItem('defaultPrinter', sel.value);
             
             const orderIds = Array.from(selectedOrderIds);
             const btn = document.getElementById('print-selected-btn');
@@ -1980,7 +2205,8 @@
                     const response = await fetch('/api/print-waybill', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ InvoiceId: invoiceId, printer: printer })
+                        body: JSON.stringify({ InvoiceId: invoiceId, printer: printer,
+                                               channel: t2.channel, zpl_ip: t2.zplIp, zpl_port: t2.zplPort })
                     });
                     
                     const data = await response.json();
@@ -2040,8 +2266,8 @@
                     return;
                 }
                 renderOrderDetail(data, content);
-                // 載入打印機列表
-                setTimeout(loadPrinters, 100);
+                // 列印方式提示（印表機設定已搬到「設定」頁）
+                setTimeout(updatePrintModeHint, 100);
             })
             .catch(error => {
                 content.innerHTML = `<div class="no-results">請求失敗: ${error.message}</div>`;
@@ -2527,7 +2753,7 @@
         
         // 頁面載入時載入訂單
         window.addEventListener('load', loadOrders);
-        window.addEventListener('load', initDefaultPrinter);
+        window.addEventListener('load', loadAppSettings);
 
         // ================= 地址管理 =================
         let allAddresses = [];
