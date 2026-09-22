@@ -22,8 +22,8 @@ ping -n 3 127.0.0.1 >nul
 echo [OK] Services stopped
 echo.
 
-echo [2/3] Cleaning and re-installing PyMuPDF, then checking everything ...
-echo       Downloads about 25 MB.
+echo [2/3] Installing missing system runtime, then re-installing PyMuPDF ...
+echo       Downloads up to 50 MB.
 echo.
 ".venv\Scripts\python.exe" check_deps.py --repair
 if errorlevel 1 goto :repair_fail
@@ -61,7 +61,13 @@ exit /b 1
 :repair_fail
 echo.
 echo [ERROR] Repair did NOT fully succeed. See the messages above.
-echo Please copy the whole output and send it to the developer.
+echo.
+echo If it says the VC++ runtime is missing, do this first:
+echo   1. Right-click install_vcruntime.bat and choose Run as administrator
+echo   2. Reboot if it asks you to
+echo   3. Run repair_deps.bat again
+echo.
+echo Otherwise copy the whole output and send it to the developer.
 echo.
 pause
 exit /b 1

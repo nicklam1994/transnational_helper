@@ -1,0 +1,112 @@
+==========================================
+  Teamwork Helper - Repair Dependencies
+==========================================
+
+Use this when:
+  - Printing stopped working
+  - ImportError: DLL load failed while importing _extra
+  - Import check failed during setup
+
+[1/3] Stopping services, to unlock files ...
+[OK] Services stopped
+
+[2/3] Cleaning and re-installing PyMuPDF, then checking everything ...
+      Downloads about 25 MB.
+
+==============================================================
+  德安物流小助手 - 依賴檢查
+==============================================================
+  Python  : 3.14.7
+  架構    : 64-bit
+  位置    : C:\transnational_helper\.venv\Scripts\python.exe
+
+  檢查中…
+
+--------------------------------------------------------------
+  套件檢查結果
+--------------------------------------------------------------
+  [OK]   flask       Web 服務                 3.1.3
+  [OK]   flask_cors  跨網域請求                  6.0.5
+  [OK]   requests    呼叫 Teamwork API        2.34.2
+  [OK]   PyPDF2      PDF 頁數／標籤重建            3.0.1
+  [缺失] pymupdf     PDF 點陣化（GDI 直印／ZPL 直送必要） ImportError: DLL load failed while importing _extra: The specified mod
+  [OK]   win32print  GDI 直接列印               312
+  [缺失] win32ui     GDI 直接列印               ImportError: DLL load failed while importing win32ui: The specified mo
+  [OK]   PIL         影像處理（GDI 列印必要）         12.3.0
+  [OK]   playwright  Edge 自動登入（Token 保活）    1.63.0
+
+  PyMuPDF 原生檔案（DLL load failed 的根源）:
+    [OK]   _extra.pyd OK (0.2 MB)
+    [OK]   _mupdf.pyd OK (12.5 MB)
+    [OK]   mupdfcpp64.dll OK (25.1 MB)
+
+  Visual C++ 執行檔 (System32): 缺少 msvcp140.dll, vcruntime140.dll, vcruntime140_1.dll
+  → 這也可能是 _extra.pyd 載入失敗的原因。請安裝：
+    "Microsoft Visual C++ 2015-2022 Redistributable (x64)"
+    https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+==============================================================
+  發現問題：
+    - pymupdf (pymupdf)
+    - win32ui (pywin32)
+==============================================================
+
+  開始修復…
+  （若舊服務仍在跑，檔案會被鎖住 —— 請先關閉，或用 repair_deps.bat）
+
+  [a] 移除舊的 PyMuPDF / fitz
+      $ uninstall -y pymupdf fitz
+Found existing installation: pymupdf 1.28.2
+Uninstalling pymupdf-1.28.2:
+  Successfully uninstalled pymupdf-1.28.2
+WARNING: Skipping fitz as it is not installed.
+
+  [b] 重新安裝: pymupdf, pywin32
+      $ install --no-cache-dir --upgrade --force-reinstall --only-binary=:all: pymupdf==1.28.2 pywin32
+Collecting pymupdf==1.28.2
+  Downloading pymupdf-1.28.2-cp310-abi3-win_amd64.whl.metadata (26 kB)
+Collecting pywin32
+  Downloading pywin32-312-cp314-cp314-win_amd64.whl.metadata (11 kB)
+Downloading pymupdf-1.28.2-cp310-abi3-win_amd64.whl (19.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 19.8/19.8 MB 9.3 MB/s  0:00:02
+Downloading pywin32-312-cp314-cp314-win_amd64.whl (7.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.0/7.0 MB 8.6 MB/s  0:00:00
+Installing collected packages: pywin32, pymupdf
+  Attempting uninstall: pywin32
+    Found existing installation: pywin32 312
+    Uninstalling pywin32-312:
+      Successfully uninstalled pywin32-312
+Successfully installed pymupdf-1.28.2 pywin32-312
+
+  [c] 重新檢查（新行程）…
+
+--------------------------------------------------------------
+  套件檢查結果
+--------------------------------------------------------------
+  [OK]   flask       Web 服務                 3.1.3
+  [OK]   flask_cors  跨網域請求                  6.0.5
+  [OK]   requests    呼叫 Teamwork API        2.34.2
+  [OK]   PyPDF2      PDF 頁數／標籤重建            3.0.1
+  [缺失] pymupdf     PDF 點陣化（GDI 直印／ZPL 直送必要） ImportError: DLL load failed while importing _extra: The specified mod
+  [OK]   win32print  GDI 直接列印               312
+  [缺失] win32ui     GDI 直接列印               ImportError: DLL load failed while importing win32ui: The specified mo
+  [OK]   PIL         影像處理（GDI 列印必要）         12.3.0
+  [OK]   playwright  Edge 自動登入（Token 保活）    1.63.0
+
+  PyMuPDF 原生檔案（DLL load failed 的根源）:
+    [OK]   _extra.pyd OK (0.2 MB)
+    [OK]   _mupdf.pyd OK (12.5 MB)
+    [OK]   mupdfcpp64.dll OK (25.1 MB)
+
+==============================================================
+  [修復未完成] 仍有問題: pymupdf, win32ui
+  請依序嘗試：
+    1. 關閉所有 python.exe / 服務，再執行 repair_deps.bat
+    2. 確認防毒沒有隔離 mupdfcpp64.dll
+    3. 確認磁碟剩餘空間 >= 1GB（PyMuPDF 解壓後約 40MB）
+    4. 安裝 VC++ 2015-2022 Redistributable (x64)
+  若仍失敗，請把以上整段輸出複製給開發者。
+==============================================================
+
+[ERROR] Repair did NOT fully succeed. See the messages above.
+Please copy the whole output and send it to the developer.

@@ -22,6 +22,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -155,6 +156,68 @@ def check_vcruntime():
     return (not missing), missing
 
 
+# ── 系統 runtime 自動安裝 ────────────────────────────────────────────────
+# PyMuPDF 的 _extra.pyd 與 pywin32 的 win32ui.pyd 都動態連結 MSVC 執行檔。
+# 全新安裝的 Windows 常常沒有它 → 匯入時報「DLL load failed ... module could not be found」，
+# 而套件檔案其實完好無缺（重裝完全沒用）。這是實測案例（2026-09-22）的根因。
+VCREDIST_URL = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'
+
+
+def download_file(url, dst):
+    import urllib.request
+
+    last = [0]
+
+    def hook(blocks, bs, total):
+        if total > 0:
+            pct = min(100, int(blocks * bs * 100 / total))
+            if pct >= last[0] + 20:
+                last[0] = pct
+                log('        下載中 %d%%' % pct)
+
+    log('      下載 %s' % url)
+    urllib.request.urlretrieve(url, dst, hook)
+
+
+def install_vcruntime():
+    """下載並安裝 VC++ 2015-2022 Redistributable (x64)。回傳 (成功?, 訊息)"""
+    import tempfile
+    dst = os.path.join(tempfile.gettempdir(), 'vc_redist.x64.exe')
+    try:
+        if (not os.path.exists(dst)) or os.path.getsize(dst) < 5_000_000:
+            download_file(VCREDIST_URL, dst)
+    except Exception as e:
+        return False, ('下載失敗：%s\n        請手動安裝：%s' % (e, VCREDIST_URL))
+    log('      已下載：%s (%.1f MB)' % (dst, os.path.getsize(dst) / 1048576.0))
+
+    args = ['/install', '/quiet', '/norestart']
+    try:
+        rc = subprocess.call([dst] + args)
+        # 0=成功 1638=已裝其他版本 3010=成功需重開機
+        if rc in (0, 1638, 3010):
+            return True, '靜默安裝完成 (rc=%d)' % rc
+        log('      靜默安裝回傳 rc=%d，改用提權方式（會彈 UAC，請按「是」）' % rc)
+    except OSError as e:
+        log('      直接執行失敗（%s），改用提權方式（會彈 UAC，請按「是」）' % e)
+
+    # 需要管理員權限 → ShellExecute runas 觸發 UAC
+    try:
+        import ctypes
+        r = ctypes.windll.shell32.ShellExecuteW(None, 'runas', dst, ' '.join(args), None, 1)
+        if r <= 32:
+            return False, ('提權失敗 (code=%d)\n        請右鍵以「系統管理員身分」執行 install_vcruntime.bat'
+                           % r)
+    except Exception as e:
+        return False, '提權失敗：%s' % e
+
+    for i in range(60):                      # 最多等 180 秒
+        time.sleep(3)
+        ok, _ = check_vcruntime()
+        if ok:
+            return True, '安裝完成（等了 %d 秒）' % ((i + 1) * 3)
+    return False, '安裝後仍未偵測到 VC++ 執行檔，可能被取消，或需要重新開機'
+
+
 def print_results(results, pm_ok, pm_detail):
     log('-' * 62)
     log('  套件檢查結果')
@@ -236,6 +299,31 @@ def main():
     log('  （若舊服務仍在跑，檔案會被鎖住 —— 請先關閉，或用 repair_deps.bat）')
     log('')
 
+    # ── 先補系統 runtime：缺 VC++ 時，重裝任何套件都不會有用 ──
+    if not vc_ok:
+        log('  [0] 安裝系統缺少的 VC++ 2015-2022 Redistributable (x64)')
+        log('      ← 這才是 _extra.pyd / win32ui 載入失敗的真正原因（套件檔案可能完好）')
+        log('')
+        ok_vc, msg_vc = install_vcruntime()
+        log('      → %s' % msg_vc)
+        log('')
+        vc_ok, vc_missing = check_vcruntime()
+        if vc_ok:
+            log('  [0] runtime 已補上，重新檢查套件（可能無需重裝）…')
+            results = check_all()
+            pm_ok, pm_detail = check_pymupdf_files()
+            still0 = [r[0] for r in REQUIRED if not results.get(r[0], {}).get('ok')]
+            log('')
+            print_results(results, pm_ok, pm_detail)
+            if not still0 and pm_ok:
+                log('')
+                log('=' * 62)
+                log('  [修復成功] 只是缺系統 runtime，套件本身完好，無需重裝。')
+                log('=' * 62)
+                return 0
+            log('')
+            log('  仍有問題，繼續重裝套件…')
+
     log('  [a] 移除舊的 PyMuPDF / fitz')
     pip(['uninstall', '-y', 'pymupdf', 'fitz'])
 
@@ -270,12 +358,21 @@ def main():
         log('=' * 62)
         return 0
     log('  [修復未完成] 仍有問題: %s' % (', '.join(still) if still else 'PyMuPDF 原生檔案'))
-    log('  請依序嘗試：')
-    log('    1. 關閉所有 python.exe / 服務，再執行 repair_deps.bat')
+    log('')
+    if not vc_ok:
+        log('  ★ 最主要原因：系統缺少 VC++ 執行檔 → %s' % ', '.join(vc_missing))
+        log('    _extra.pyd / win32ui.pyd 必須靠它才能載入，重裝套件不會有幫助。')
+        log('    → 右鍵以「系統管理員身分」執行 install_vcruntime.bat')
+        log('      或手動安裝：https://aka.ms/vs/17/release/vc_redist.x64.exe')
+        log('      安裝後可能需要重新開機再試。')
+    elif pm_ok:
+        log('  ★ 套件原生檔案都完好，但匯入仍失敗 → 幾乎肯定是系統層面的問題：')
+        log('    缺 VC++ 執行檔、防毒即時攔截、或需要重新開機。')
+    log('')
+    log('  其他可嘗試：')
+    log('    1. 關閉所有 python.exe / 服務後，再執行 repair_deps.bat')
     log('    2. 確認防毒沒有隔離 mupdfcpp64.dll')
     log('    3. 確認磁碟剩餘空間 >= 1GB（PyMuPDF 解壓後約 40MB）')
-    if not vc_ok:
-        log('    4. 安裝 VC++ 2015-2022 Redistributable (x64)')
     log('  若仍失敗，請把以上整段輸出複製給開發者。')
     log('=' * 62)
     return 1
