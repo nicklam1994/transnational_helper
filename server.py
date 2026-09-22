@@ -553,6 +553,7 @@ def print_pdf_via_gdi(pdf_bytes, printer_name, doc_name='Waybill', threshold=INK
       現在改成「依 DC 實測規格送圖」：
         ① 以印表機原生解析度點陣化，尺寸與畫布 1:1 → 完全不做二次縮放
         ② DC 是 1-bit 就先硬門檻二值化再送 → 沒有灰階，驅動無從抖動
+        ③ 用同一個放大倍率（等比 fit + 置中）→ 不可 x/y 各自拉滿，否則內容會變形
       另外門檻值本身也曾出錯（128 會刪掉 logo 與灰色色帶）：見 INK_THRESHOLD 說明。
       （A4 的 HP 驅動 DC 是 8-bit 灰階 / 600dpi，維持灰階直送即可，不二值化。）
 
@@ -575,18 +576,26 @@ def print_pdf_via_gdi(pdf_bytes, printer_name, doc_name='Waybill', threshold=INK
         pages = 0
         for page in doc:
             rect = page.rect
-            # 整頁對映到恰好 pw x ph 個裝置像素 → 就是原生解析度，之後不再縮放
-            mat = fitz.Matrix(pw / rect.width, ph / rect.height)
+            # ★ 等比縮放（fit）＋ 置中：x / y 必須用同一個倍率！
+            #   曾用 Matrix(pw/頁寬, ph/頁高) 各自拉滿 → 非等比 → 內容變形。
+            #   實例：A4 收據 0.7067 vs HP 可列印區 0.7690 → 水平被拉長 8.1%（肉眼可見「同原版有出入」）。
+            #   標籤頁 102x210mm 剛好同畫布同比例，所以標籤睇唔出問題，但 A4 會走樣。
+            s = min(pw / rect.width, ph / rect.height)
+            w = max(1, int(round(rect.width * s)))
+            hgt = max(1, int(round(rect.height * s)))
+            mat = fitz.Matrix(s, s)
             pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY, alpha=False)
             im = Image.frombytes('L', (pix.width, pix.height), pix.samples)
-            if im.size != (pw, ph):
-                im = im.resize((pw, ph), Image.LANCZOS)
+            if im.size != (w, hgt):
+                im = im.resize((w, hgt), Image.LANCZOS)
             if mono:
                 # 硬門檻二值化（明確關閉抖動）→ 送出的就是最終黑點，驅動無從加噪
                 im = im.point(lambda v: 255 if v >= threshold else 0)
                 im = im.convert('1', dither=getattr(getattr(Image, 'Dither', Image), 'NONE', 0))
+            x0 = (pw - w) // 2
+            y0 = (ph - hgt) // 2
             hdc.StartPage()
-            ImageWin.Dib(im).draw(hdc.GetHandleOutput(), (0, 0, pw, ph))
+            ImageWin.Dib(im).draw(hdc.GetHandleOutput(), (x0, y0, x0 + w, y0 + hgt))
             hdc.EndPage()
             pages += 1
         hdc.EndDoc()
