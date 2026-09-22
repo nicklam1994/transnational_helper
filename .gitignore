@@ -38,3 +38,5 @@ api_test_results.json
 
 # Screenshots
 *.png
+_server_out.log
+*.log
