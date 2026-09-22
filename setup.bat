@@ -86,10 +86,10 @@ echo [OK] venv ready
 
 echo.
 
-echo [3/4] Installing packages (flask, requests, playwright, PyPDF2, PyMuPDF)...
+echo [3/4] Installing packages (flask, requests, playwright, PyPDF2, PyMuPDF, pywin32, pillow)...
 ".venv\Scripts\python.exe" -m pip install --no-cache-dir --upgrade pip
 if errorlevel 1 goto :install_fail
-".venv\Scripts\python.exe" -m pip install --no-cache-dir flask flask-cors requests playwright PyPDF2 pymupdf
+".venv\Scripts\python.exe" -m pip install --no-cache-dir flask flask-cors requests playwright PyPDF2 pymupdf pywin32 pillow
 if errorlevel 1 goto :install_fail
 echo [OK] Packages installed
 
@@ -100,7 +100,7 @@ echo.
 
 echo [4/4] Verifying installation...
 
-".venv\Scripts\python.exe" -c "import flask, requests, greenlet, PyPDF2; import fitz; from playwright.sync_api import sync_playwright; print('All imports OK')"
+".venv\Scripts\python.exe" -c "import flask, requests, greenlet, PyPDF2; import fitz; import win32print, win32ui, win32con; from PIL import Image, ImageWin; from playwright.sync_api import sync_playwright; print('All imports OK')"
 
 if errorlevel 1 goto :verify_fail
 

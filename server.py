@@ -11,6 +11,7 @@ import requests
 import json
 import os
 import time
+import threading
 
 # 列印功能需要 PyPDF2（缺少時給出明確提示，而不是原始 500）
 try:
@@ -30,6 +31,17 @@ try:
 except Exception as _e:
     ZPL_OK = False
     ZPL_ERR = str(_e)
+
+# 本機印表機直印需要 pywin32 + Pillow（PyMuPDF 點陣化 → GDI 直接列印）
+#   → 不需要 Adobe / Foxit / SumatraPDF，無對話框、無「假成功」
+try:
+    import win32print, win32ui, win32con
+    from PIL import Image, ImageWin
+    GDI_OK = True
+    GDI_ERR = ''
+except Exception as _e:
+    GDI_OK = False
+    GDI_ERR = str(_e)
 
 app = Flask(__name__)
 CORS(app)
@@ -289,6 +301,15 @@ def print_waybill():
             print_mode = "A4 整張模式"
         
         # 乾跑模式：只驗證 PDF/ZPL 產生結果，不送印（測試用）
+        try:
+            _pg0 = PdfReader(io.BytesIO(merged_pdf)).pages[0]
+            _dims = '%.0fx%.0fpt' % (float(_pg0.mediabox.width), float(_pg0.mediabox.height))
+        except Exception:
+            _dims = '?'
+        print("[print] order=%s printer=%r channel=%s mode=%s pages=%s build=%s pdf=%s pagesize=%s dry=%s"
+              % (invoice_id, printer_name, channel, print_mode, page_count, label_build or '-',
+                 len(merged_pdf), _dims, bool(data.get('dry_run'))), flush=True)
+
         if data.get('dry_run'):
             info = {
                 "success": True,
@@ -312,91 +333,60 @@ def print_waybill():
                     info['zpl_error'] = 'PyMuPDF 不可用'
             return jsonify(info)
         
-        # 送印順序（用戶指定）：**PDF 處理程式（Adobe Reader）/h /t 為首選**，
-        # A4 與標籤都用它；**ZPL 直送作為標籤機的備選**。
-        # channel 可強制指定：auto（預設，先 PDF 再 ZPL）| pdf | zpl
-        pdf_err = ''
-        zpl_err = ''
+        # 送印方式（2026-09-21 改為原生路徑，完全移除 Adobe / Foxit / ShellExecute）：
+        #   channel='zpl'  → ZPL 直送印表機 raw 埠（標籤機，不經 Windows 驅動）
+        #   channel='pdf'  → pywin32 GDI 直接列印（A4 與標籤機皆可，無對話框）
+        #   channel='auto' → 標籤機走 ZPL，其餘走 GDI
+        use_zpl = (channel == 'zpl') or (channel == 'auto' and is_label_printer)
+        order_no = order_row.get('OrderNo') or order_detail.get('OrderNo') or str(invoice_id)
 
-        def _delete_later(path):
-            import threading as _th
-            import time as _t
-            def _run():
-                _t.sleep(2)
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
-            _th.Thread(target=_run, daemon=True).start()
-
-        # 5a. 首選：交給 PDF 處理程式列印（註冊表 printto 指令列 → 如 Adobe Reader /h /t）
-        if channel != 'zpl':
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-                tmp.write(merged_pdf)
-                tmp_path = tmp.name
-            ok, method = send_pdf_to_printer(tmp_path, printer_name)
-            if ok:
-                _delete_later(tmp_path)
-                return jsonify({
-                    "success": True,
-                    "message": f"已發送到 {printer_name} ({print_mode})",
-                    "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
-                    "mode": print_mode,
-                    "build": label_build,
-                    "send_method": method
-                })
-            pdf_err = method
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-            if channel == 'pdf':
-                return jsonify({"success": False, "error": "送印失敗：" + pdf_err}), 500
-
-        # 5b. 備選（僅標籤機）：自己把 PDF 點陣化成 ZPL，直送印表機 raw 埠（預設 9100）
-        if is_label_printer:
+        if use_zpl:
             ip = zpl_ip_req or _printer_ip(printer_name)
             if not ip:
-                zpl_err = '無法取得印表機 IP（請在設定頁填寫）'
-            elif not ZPL_OK:
-                zpl_err = 'PyMuPDF 不可用'
-            else:
-                try:
-                    zpl = build_zpl_from_pdf(merged_pdf)
-                    send_zpl_via_tcp(zpl, ip, zpl_port_req)
-                    note = ('；PDF 送印失敗：' + pdf_err) if pdf_err else ''
-                    return jsonify({
-                        "success": True,
-                        "message": f"已直送 {printer_name or ip} ({print_mode}){note}",
-                        "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
-                        "mode": print_mode,
-                        "build": label_build,
-                        "send_method": f"ZPL 直送 {ip}:{zpl_port_req} ({len(zpl)} bytes){note}"
-                    })
-                except Exception as e:
-                    zpl_err = str(e)
+                return jsonify({"success": False, "error":
+                                "ZPL 直送需要印表機 IP：請在「設定 → 網絡 (IP)」填寫，或選含 IP 的印表機名稱"}), 400
+            if not ZPL_OK:
+                return jsonify({"success": False, "error": "ZPL 直送需要 PyMuPDF：" + ZPL_ERR}), 500
+            try:
+                zpl = build_zpl_from_pdf(merged_pdf)
+                send_zpl_via_tcp(zpl, ip, zpl_port_req)
+            except Exception as e:
+                return jsonify({"success": False, "error": "ZPL 直送失敗：" + str(e)}), 500
+            print("[print] → ZPL 直送 %s:%s (%d bytes)" % (ip, zpl_port_req, len(zpl)), flush=True)
+            return jsonify({
+                "success": True,
+                "message": "已直送 %s (%s)" % (printer_name or ip, print_mode),
+                "order_no": order_no,
+                "mode": print_mode,
+                "build": label_build,
+                "send_method": "ZPL 直送 %s:%s (%d bytes)" % (ip, zpl_port_req, len(zpl))
+            })
 
-        return jsonify({"success": False, "error": "送印失敗：%s%s" % (
-            pdf_err,
-            ("；ZPL 直送也失敗：" + zpl_err) if zpl_err else ""
-        )}), 500
-        
+        # GDI 直接列印（不需任何 PDF 閱讀程式）
+        if not GDI_OK:
+            return jsonify({"success": False, "error":
+                            "本機直印需要 pywin32 與 Pillow，請執行 pip install pywin32 pillow（詳情：" + GDI_ERR + "）"}), 500
+        try:
+            with _PRINT_LOCK:
+                sent_pages = print_pdf_via_gdi(merged_pdf, printer_name, dpi=GDI_DPI,
+                                               doc_name='Waybill ' + str(order_no))
+        except Exception as e:
+            return jsonify({"success": False, "error": "GDI 送印失敗：" + str(e)}), 500
+        print("[print] → GDI 直印 %r %d 頁" % (printer_name, sent_pages), flush=True)
+
+        return jsonify({
+            "success": True,
+            "message": "已發送到 %s (%s)" % (printer_name, print_mode),
+            "order_no": order_no,
+            "mode": print_mode,
+            "build": label_build,
+            "send_method": "GDI 直印 %s（%d 頁 / %ddpi）" % (printer_name, sent_pages, GDI_DPI)
+        })
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
-
-def _pdf_handler_printto_template():
-    """從註冊表取得 .pdf 處理程式的 printto 指令範本（例如 Foxit 的 /t "%1" "%2"）。"""
-    try:
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, '.pdf') as k:
-            handler = winreg.QueryValueEx(k, None)[0]
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, handler + r'\shell\printto\command') as k:
-            return winreg.QueryValueEx(k, None)[0]
-    except Exception:
-        return None
 
 
 def _printer_ip(printer_name):
@@ -528,70 +518,51 @@ def build_label_pdf_legacy(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM)
     return out.getvalue()
 
 
-def send_pdf_to_printer(file_path, printer_name):
-    """把 PDF 送到指定印表機，回傳 (成功, 使用的方法說明)。
 
-    重要：不能用 PowerShell 的 `Start-Process -Verb PrintTo -ArgumentList "<printer>"`。
-    ShellExecute 不會把印表機名餵進 PDF 處理程式的 /t 參數（Foxit 會只把檔案打開，
-    彈出列印對話框，標籤機佇列全程 0 個工作）。必須直接照註冊表 printto 範本組指令列。
+
+GDI_DPI = 300
+_PRINT_LOCK = threading.Lock()
+
+
+def print_pdf_via_gdi(pdf_bytes, printer_name, dpi=GDI_DPI, doc_name='德安運單'):
+    """PyMuPDF 點陣化 → pywin32 GDI 直接列印。回傳實際送出的頁數。
+
+    為何用這條路（2026-09-21 實測定案）：
+      - Adobe `/t`：會短暫彈窗；且 returncode 不可靠（成功也可能回 1），害我們誤判失敗
+        又去試 ShellExecute → 同一份工作送兩次（快速列印印出 4 張就是這樣來的）。
+      - ShellExecute `-Verb PrintTo`：不會把印表機名傳進 PDF 程式，還會彈窗、掉工作。
+      - GDI：無外部程式、無對話框、1 頁約 0.4 秒，連送 4 份全部進佇列（實測零遺失）。
+    EndDoc 會等 spooler 收下工作，所以回傳成功 = 真的進佇列。
     """
-    import subprocess, re
-    CREATE_NO_WINDOW = 0x08000000
+    import io
+    import fitz
+    import win32print, win32ui, win32con
+    from PIL import Image, ImageWin
 
-    # 方法 1（首選）：PDF 處理程式的 printto 指令列，例如
-    # "D:\\Foxit Software\\Foxit PDF Editor\\FoxitPDFEditor.exe" /t "%1" "%2" "%3" "%4"
-    tpl = _pdf_handler_printto_template()
-    if tpl:
-        m = re.match(r'^\s*"([^"]+)"\s*(.*)$', tpl)
-        if m:
-            exe, rest = m.group(1), m.group(2)
-        else:
-            parts = tpl.split(None, 1)
-            exe, rest = parts[0], (parts[1] if len(parts) > 1 else '')
-        if exe and os.path.exists(exe):
-            args = [exe]
-            for tok in re.findall(r'"[^"]*"|\S+', rest):
-                val = tok.strip('"')
-                val = (val.replace('%1', file_path)
-                          .replace('%2', printer_name)
-                          .replace('%3', '')
-                          .replace('%4', ''))
-                if val:  # 空的佔位符不要傳
-                    args.append(val)
-            # Adobe（Reader/Acrobat）：補 /h 避免彈出文件視窗（/h 要放在 /t 之前）
-            if (re.search(r'acrobat|acrord', os.path.basename(exe), re.I)
-                    and '/t' in args and '/h' not in args):
-                args.insert(args.index('/t'), '/h')
-            try:
-                r = subprocess.run(args, timeout=180, capture_output=True, text=True,
-                                   creationflags=CREATE_NO_WINDOW)
-                if r.returncode == 0:
-                    return True, 'PDF 處理程式指令列: ' + os.path.basename(exe)
-                err = (r.stderr or r.stdout or '').strip()[:200]
-            except Exception as e:
-                err = str(e)
-        else:
-            err = '處理程式不存在: ' + str(exe)
-    else:
-        err = '找不到 printto 指令範本'
-
-    # 方法 2（退回）：ShellExecute PrintTo
+    doc = fitz.open(stream=pdf_bytes, filetype='pdf')
+    hdc = win32ui.CreateDC()
+    hdc.CreatePrinterDC(printer_name)
     try:
-        ps = f'Start-Process -FilePath "{file_path}" -Verb PrintTo -ArgumentList "{printer_name}"'
-        subprocess.run(['powershell', '-NoProfile', '-Command', ps], check=True, timeout=120,
-                       creationflags=CREATE_NO_WINDOW)
-        return True, 'ShellExecute PrintTo（退回）'
-    except Exception as e:
-        err = err + ' / PrintTo 也失敗: ' + str(e)
-
-    # 方法 3（最後）：送到系統預設印表機
-    try:
-        ps = f'Start-Process -FilePath "{file_path}" -Verb Print'
-        subprocess.run(['powershell', '-NoProfile', '-Command', ps], check=True, timeout=120,
-                       creationflags=CREATE_NO_WINDOW)
-        return True, '系統預設印表機（退回）'
-    except Exception as e:
-        return False, err + ' / 預設印表機也失敗: ' + str(e)
+        pw = hdc.GetDeviceCaps(win32con.HORZRES)      # 可列印區寬（裝置像素）
+        ph = hdc.GetDeviceCaps(win32con.VERTRES)      # 可列印區高
+        hdc.StartDoc(doc_name)
+        pages = 0
+        for page in doc:
+            pix = page.get_pixmap(dpi=dpi, colorspace=fitz.csRGB, alpha=False)
+            im = Image.open(io.BytesIO(pix.tobytes('png')))
+            ratio = min(pw / im.width, ph / im.height)
+            w = max(1, int(im.width * ratio))
+            h = max(1, int(im.height * ratio))
+            x0 = (pw - w) // 2
+            y0 = (ph - h) // 2
+            hdc.StartPage()
+            ImageWin.Dib(im).draw(hdc.GetHandleOutput(), (x0, y0, x0 + w, y0 + h))
+            hdc.EndPage()
+            pages += 1
+        hdc.EndDoc()
+        return pages
+    finally:
+        hdc.DeleteDC()
 
 
 @app.route('/api/order-detail', methods=['POST'])
@@ -1028,13 +999,14 @@ if __name__ == '__main__':
     print("=" * 60)
     print("\n功能:")
     print("  ✓ 訂單詳情（搜索、過濾、統計）")
-    print("  ✓ 運單列印（標籤 2 張 / A4 整張）")
+    print("  ✓ 運單列印（A4 / 標籤機：GDI 直印；標簽機 ZPL：直送 IP:埠）")
     print("  ✓ 物流查詢")
     print("  ✓ Token 從 token.json 自動讀取")
     print("\n環境:")
     print(f"  Python: {sys.version.split()[0]}  ({sys.executable})")
     print(f"  列印模組 PyPDF2: {'✓ 可用' if PDF_LIB_OK else '✗ 缺少 - ' + PDF_LIB_ERR}")
-    print(f"  標籤直送 PyMuPDF: {'✓ 可用（ZPL 直送 9100）' if ZPL_OK else '✗ 缺少 - 退回系統列印' + ('' if ZPL_OK else ' - ' + ZPL_ERR)}")
+    print(f"  標籤直送 PyMuPDF: {'✓ 可用（ZPL 直送 IP:埠）' if ZPL_OK else '✗ 缺少 - ' + ZPL_ERR}")
+    print(f"  本機直印 GDI: {'✓ 可用（pywin32，無對話框）' if GDI_OK else '✗ 缺少 - ' + GDI_ERR}")
     print("\n注意：請先啟動 keepalive_service.py 維護 token")
     print("\n服務器啟動中...")
     print("請在瀏覽器中打開: http://localhost:5000")
