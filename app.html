@@ -933,61 +933,180 @@
         .switch input:checked + .slider:before { transform: translateX(22px); }
 
         /* ===== 淺色模式（body.light）=====
-           註：app 內大量使用行內深色樣式，這裡用屬性選擇器一併覆寫。 */
-        body.light { background: #f4f5fa; color: #1c1f2b; }
+           色票：背景 #f4f5fa ／ 面板 #fff ／ 正文 #1c1f2b ／ 次要 #6b7280 ／ 邊框 rgba(0,0,0,.25) */
+        body.light {
+            background: #f4f5fa;
+            color: #1c1f2b;
+        }
+        /* --- 側欄 --- */
         body.light .sidebar { background: rgba(255,255,255,0.92); border-right: 1px solid rgba(0,0,0,0.08); }
         body.light .sidebar-logo { border-bottom-color: rgba(0,0,0,0.08); }
         body.light .sidebar-logo p,
-        body.light .conn-status,
-        body.light .settings-hint,
-        body.light .page-subtitle { color: #6b7280; }
+        body.light .conn-status { color: #6b7280; }
+        body.light .nav-item { color: #374151; }
         body.light .nav-item:hover { background: rgba(0,0,0,0.04); }
-        body.light .nav-item.active { background: rgba(102,126,234,0.12); }
+        body.light .nav-item.active { background: rgba(102,126,234,0.12); color: #1c1f2b; }
+        /* --- 文字（class 層級；原本多為白/淺灰） --- */
+        body.light .page-subtitle,
+        body.light .stat-label,
+        body.light .stat-breakdown-item,
+        body.light .order-info,
+        body.light .form-group label,
+        body.light .timeline-date,
+        body.light .timeline-time,
         body.light .detail-label,
+        body.light .modal-timeline-date,
+        body.light .no-results,
+        body.light .address-stats .stat-label,
+        body.light .settings-hint,
         body.light .settings-sub { color: #6b7280; }
+        body.light .stat-value,
+        body.light .detail-value,
+        body.light .address-card-title,
+        body.light .modal-header h3,
+        body.light .modal-title,
+        body.light .timeline-mode,
+        body.light .page-title { color: #1c1f2b; }
+        body.light .order-info div { color: #374151; }
+        body.light .ms-item { color: #374151; }
+        body.light .opt-section summary { color: #4b5563; }
+        body.light .opt-section summary:hover { color: #1c1f2b; }
+        body.light .address-card-detail { color: #4b5563; }
         body.light .settings-row label { color: #374151; }
-        /* 容器／卡片（含行內深色底） */
-        body.light .settings-card,
-        body.light .order-card,
+        /* 半透明白字（說明文字/刪除線底色）→ 深字 */
+        body.light .ms-info,
+        body.light .report-legend,
+        body.light .report-hint { color: rgba(0,0,0,0.55); }
+        body.light .del-strike { color: rgba(0,0,0,0.45); }
+        /* 強調色在淺底要加深才夠對比 */
+        body.light .ms-clear { color: #c62828; }
+        body.light .cancel-tag { color: #c62828; }
+        body.light .status-ongoing { background: rgba(255,167,38,0.18); color: #a85d00; }
+        body.light .status-completed { background: rgba(76,175,80,0.18); color: #2e7d32; }
+        body.light .status-cancelled { background: rgba(239,83,80,0.16); color: #c62828; }
+        body.light .filter-clear-all { color: #c62828 !important; background: rgba(198,40,40,0.08); border-color: rgba(198,40,40,0.35); }
+        /* --- 卡片／面板（含 class 與行內深色底） --- */
         body.light .stat-card,
-        body.light .ms-panel,
+        body.light .address-stats .stat-card,
+        body.light .order-card,
+        body.light .address-card,
+        body.light .opt-section,
+        body.light .settings-card,
+        body.light .modal,
         body.light .modal-content,
-        body.light .confirm-box { background: #fff; }
+        body.light .confirm-box,
+        body.light .toast,
+        body.light .ms-panel { background: #fff; }
+        body.light .order-card:hover,
+        body.light .address-card:hover,
+        body.light .address-stats .stat-card:hover { background: #f7f8fc; }
+        body.light .address-card,
+        body.light .address-stats .stat-card,
+        body.light .modal-content,
+        body.light .confirm-box,
+        body.light .toast,
+        body.light .opt-section { border-color: rgba(0,0,0,0.12); }
+        body.light .modal { border-color: rgba(0,0,0,0.12); box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+        body.light .toast { color: #1c1f2b; box-shadow: 0 10px 26px rgba(0,0,0,0.12); }
+        body.light .modal-overlay { background: rgba(0,0,0,0.35); }
+        body.light .confirm-box { color: #1c1f2b; }
+        /* 行內深色底（rgba 白） */
         body.light [style*="rgba(255,255,255,0.05)"],
         body.light [style*="rgba(255, 255, 255, 0.05)"] { background: #ffffff !important; }
         body.light [style*="rgba(255,255,255,0.02)"],
-        body.light [style*="rgba(255, 255, 255, 0.02)"] { background: #fafbff !important; }
+        body.light [style*="rgba(255, 255, 255, 0.02)"],
+        body.light [style*="rgba(255,255,255,0.03)"] { background: #fafbff !important; }
+        body.light [style*="rgba(255,255,255,0.08)"] { background: rgba(0,0,0,0.04) !important; }
         body.light [style*="rgba(255,255,255,0.1)"],
         body.light [style*="rgba(255, 255, 255, 0.1)"] { background: rgba(0,0,0,0.05) !important; }
+        body.light [style*="rgba(255,255,255,0.12)"],
         body.light [style*="rgba(255,255,255,0.15)"],
         body.light [style*="rgba(255, 255, 255, 0.15)"] { background: rgba(0,0,0,0.07) !important; }
         body.light [style*="rgba(102,126,234,0.2)"],
         body.light [style*="rgba(102, 126, 234, 0.2)"] { background: rgba(102,126,234,0.15) !important; }
-        /* 文字：行內白字改深字（按鈕除外，按鈕多為漸層底） */
+        body.light [style*="background: #1a1a2e"],
+        body.light [style*="background:#1a1a2e"],
+        body.light [style*="background: #232342"],
+        body.light [style*="background: #1e1e3e"] { background: #fff !important; }
+        /* 行內白字 → 深字（按鈕與漸層底除外） */
         body.light [style*="color: #fff"]:not(button):not(.btn),
         body.light [style*="color:#fff"]:not(button):not(.btn),
         body.light [style*="color: #ffffff"]:not(button):not(.btn) { color: #1c1f2b !important; }
-        body.light [style*="color: #ccc"] { color: #4b5563 !important; }
-        body.light [style*="color: #a0a0a0"] { color: #6b7280 !important; }
-        /* 表單控件 */
-        body.light .settings-select, body.light .settings-input,
-        body.light .search-box, body.light .filter-select {
-            background: #fff; border-color: rgba(0,0,0,0.15); color: #1c1f2b;
+        body.light [style*="color: #ccc"],
+        body.light [style*="color: #d0d0d0"],
+        body.light [style*="color: #b8b8c8"] { color: #4b5563 !important; }
+        body.light [style*="color: #b0b0b0"] { color: #6b7280 !important; }
+        body.light [style*="color: #a0a0a0"],
+        body.light [style*="color: #9aa0c0"] { color: #6b7280 !important; }
+        body.light [style*="color: #e0e0e0"] { color: #374151 !important; }
+        body.light [style*="color: #c8c8d8"] { color: #4b5563 !important; }
+        body.light [style*="color: rgba(255,255,255,0.4)"],
+        body.light [style*="color: rgba(255,255,255,0.45)"],
+        body.light [style*="color: rgba(255,255,255,0.5)"],
+        body.light [style*="color: rgba(255,255,255,0.55)"] { color: rgba(0,0,0,0.55) !important; }
+        /* --- 表單控件：淺底 + 明顯邊框 + 深字 --- */
+        body.light .search-box,
+        body.light .search-input,
+        body.light .filter-select,
+        body.light .ms-btn,
+        body.light .settings-select,
+        body.light .settings-input,
+        body.light .form-group input,
+        body.light .form-group select,
+        body.light .form-group textarea {
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.25);
+            color: #1c1f2b;
         }
-        body.light select option { background: #fff; color: #1c1f2b; }
+        body.light .search-box:focus,
+        body.light .search-input:focus,
+        body.light .filter-select:focus,
+        body.light .form-group input:focus,
+        body.light .form-group select:focus,
+        body.light .form-group textarea:focus,
+        body.light .settings-select:focus,
+        body.light .settings-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #fff;
+        }
+        body.light .search-input:focus { background: #fff; }
+        body.light input::placeholder,
+        body.light textarea::placeholder,
         body.light .date-input::placeholder,
-        body.light .search-box::placeholder { color: rgba(0,0,0,0.4); }
-        body.light .orders-grid .order-info div { color: #374151; }
-        body.light .ms-item { color: #1c1f2b; }
-        body.light table td, body.light table th { color: #1c1f2b; }
-        body.light .filter-clear-all {
-            color: #c62828 !important;
-            background: rgba(198,40,40,0.08);
-            border-color: rgba(198,40,40,0.35);
+        body.light .search-box::placeholder,
+        body.light .search-input::placeholder { color: rgba(0,0,0,0.42); }
+        body.light .date-input { color-scheme: light; }
+        body.light select option,
+        body.light .filter-select option,
+        body.light .form-group select option,
+        body.light .settings-select option { background: #fff; color: #1c1f2b; }
+        /* --- 按鈕 --- */
+        body.light .btn-secondary {
+            background: #fff;
+            color: #1c1f2b;
+            border: 1px solid rgba(0,0,0,0.22);
         }
-        body.light .stat-label { color: #6b7280; }
-        body.light .stat-value { color: #1c1f2b; }
-        body.light .order-id, body.light .page-title { color: #1c1f2b; }
+        body.light .btn-secondary:hover { background: #f1f2f8; }
+        body.light .modal-close { background: rgba(0,0,0,0.06); color: #1c1f2b; }
+        body.light .modal-close:hover { background: rgba(0,0,0,0.12); }
+        /* --- 分隔線／時間軸 --- */
+        body.light .stat-breakdown,
+        body.light .modal-header,
+        body.light .detail-section h4 { border-color: rgba(0,0,0,0.1); }
+        body.light .modal-timeline-item { border-bottom-color: rgba(0,0,0,0.07); }
+        body.light .timeline-item::before { border-color: #f4f5fa; }
+        body.light table td, body.light table th { color: #1c1f2b; }
+        /* --- 開關（Dark mode toggle）：半透明白底在淺色下看不到 --- */
+        body.light .switch .slider { background: rgba(0,0,0,0.28); }
+        body.light .switch .slider:before { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+        body.light .switch input:checked + .slider { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        /* 載入中的轉圈：白色軌道在淺色下看不到 */
+        body.light .spinner { border-color: rgba(0,0,0,0.12); border-top-color: #667eea; }
+        /* 日期/勾選框等原生控件 */
+        body.light .ms-item input[type="checkbox"] { accent-color: #667eea; }
+        /* ms-badge 在淺底：保持品牌色即可 */
+        body.light .ms-btn .ms-badge { color: #fff; }
     </style>
 </head>
 <body>
