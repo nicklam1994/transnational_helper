@@ -251,71 +251,31 @@ def print_waybill():
         
         import io
         
+        label_build = ''
         if is_label_printer:
-            # 標籤打印機：切割處理，分兩張打印
-            pdf_bytes = io.BytesIO(pdf_response.content)
-            reader = PdfReader(pdf_bytes)
-            
-            mm = 72 / 25.4
-            label_w = 102 * mm
-            label_h = 210 * mm
-            
-            # 上半部分：表格 Y 441.8-802.0（去掉 Order created By）
-            top_crop = {'x0': 20, 'y0': 441.8, 'x1': 575, 'y1': 802.0, 'h': 360.2}
-            # 下半部分：表格 Y 42.1-402.3（去掉底部的自我）
-            bottom_crop = {'x0': 0, 'y0': 42.1, 'x1': 575, 'y1': 402.3, 'h': 360.2}
-            
-            def calc(crop, label_w, label_h):
-                rotated_w = crop['h']
-                rotated_h = crop['x1'] - crop['x0']
-                scale = min(label_w / rotated_w, label_h / rotated_h)
-                scaled_w = rotated_w * scale
-                scaled_h = rotated_h * scale
-                x_off = (label_w - scaled_w) / 2
-                y_off = (label_h - scaled_h) / 2
-                return scale, x_off, y_off
-            
-            writer = PdfWriter()
-            
-            # 上半
-            page1 = reader.pages[0]
-            page1.mediabox = RectangleObject((top_crop['x0'], top_crop['y0'], top_crop['x1'], top_crop['y1']))
-            top_scale, top_x_off, top_y_off = calc(top_crop, label_w, label_h)
-            a, b, c, d = 0, -top_scale, top_scale, 0
-            e = -top_crop['y0'] * top_scale + top_x_off
-            f = top_crop['x1'] * top_scale + top_y_off
-            page1.add_transformation(Transformation((a, b, c, d, e, f)))
-            page1.mediabox = RectangleObject((0, 0, label_w, label_h))
-            page1.cropbox = RectangleObject((0, 0, label_w, label_h))
-            writer.add_page(page1)
-            
-            # 下半
-            reader2 = PdfReader(io.BytesIO(pdf_response.content))
-            page2 = reader2.pages[0]
-            page2.mediabox = RectangleObject((bottom_crop['x0'], bottom_crop['y0'], bottom_crop['x1'], bottom_crop['y1']))
-            bot_scale, bot_x_off, bot_y_off = calc(bottom_crop, label_w, label_h)
-            a, b, c, d = 0, -bot_scale, bot_scale, 0
-            e = -bottom_crop['y0'] * bot_scale + bot_x_off
-            f = bottom_crop['x1'] * bot_scale + bot_y_off
-            page2.add_transformation(Transformation((a, b, c, d, e, f)))
-            page2.mediabox = RectangleObject((0, 0, label_w, label_h))
-            page2.cropbox = RectangleObject((0, 0, label_w, label_h))
-            writer.add_page(page2)
-            
+            # 標籤機：切成兩張 102x210mm
+            #   優先用 PyMuPDF 重建乾淨版（Adobe Reader 只吃這種構造），
+            #   失敗才退回 PyPDF2 舊法（Reader 印不出，但 Foxit 可以）
+            if ZPL_OK:
+                try:
+                    merged_pdf = build_label_pdf_clean(pdf_response.content)
+                    label_build = 'PyMuPDF 重建（Reader 相容）'
+                except Exception as e:
+                    merged_pdf = build_label_pdf_legacy(pdf_response.content)
+                    label_build = 'PyPDF2 舊法（PyMuPDF 重建失敗: %s）' % e
+            else:
+                merged_pdf = build_label_pdf_legacy(pdf_response.content)
+                label_build = 'PyPDF2 舊法（PyMuPDF 不可用）'
+            page_count = 2
             print_mode = "標籤模式（2張）"
         else:
-            # 普通打印機：直接打印 A4 整張
-            writer = PdfWriter()
-            reader = PdfReader(io.BytesIO(pdf_response.content))
-            for page in reader.pages:
-                writer.add_page(page)
+            # 普通打印機：原檔 1:1 直出，不改寫 PDF（Reader/Foxit 都最不會出問題）
+            merged_pdf = pdf_response.content
+            try:
+                page_count = len(PdfReader(io.BytesIO(merged_pdf)).pages)
+            except Exception:
+                page_count = 1
             print_mode = "A4 整張模式"
-        
-        # 4. 合併後的 PDF 位元組（不落地，直接產生）
-        buf = io.BytesIO()
-        writer.write(buf)
-        merged_pdf = buf.getvalue()
-        page_count = len(writer.pages)
         
         # 乾跑模式：只驗證 PDF/ZPL 產生結果，不送印（測試用）
         if data.get('dry_run'):
@@ -325,6 +285,7 @@ def print_waybill():
                 "mode": print_mode,
                 "pages": page_count,
                 "pdf_bytes": len(merged_pdf),
+                "build": label_build,
                 "printer": printer_name,
                 "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo')
             }
@@ -340,10 +301,49 @@ def print_waybill():
                     info['zpl_error'] = 'PyMuPDF 不可用'
             return jsonify(info)
         
-        # 5a. 標籤機首選：自己把 PDF 點陣化成 ZPL，直送印表機 9100 埠。
-        #     完全不依賴 PDF 閱讀程式（Foxit/Acrobat/...）或 Windows 驅動，
-        #     所以任何一台電腦都能印，不會出現「印表機名沒傳進去」的問題。
+        # 送印順序（用戶指定）：**PDF 處理程式（Adobe Reader）/h /t 為首選**，
+        # A4 與標籤都用它；**ZPL 直送作為標籤機的備選**。
+        # channel 可強制指定：auto（預設，先 PDF 再 ZPL）| pdf | zpl
+        channel = str(data.get('channel') or 'auto').lower()
+        pdf_err = ''
         zpl_err = ''
+
+        def _delete_later(path):
+            import threading as _th
+            import time as _t
+            def _run():
+                _t.sleep(2)
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+            _th.Thread(target=_run, daemon=True).start()
+
+        # 5a. 首選：交給 PDF 處理程式列印（註冊表 printto 指令列 → 如 Adobe Reader /h /t）
+        if channel != 'zpl':
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                tmp.write(merged_pdf)
+                tmp_path = tmp.name
+            ok, method = send_pdf_to_printer(tmp_path, printer_name)
+            if ok:
+                _delete_later(tmp_path)
+                return jsonify({
+                    "success": True,
+                    "message": f"已發送到 {printer_name} ({print_mode})",
+                    "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
+                    "mode": print_mode,
+                    "build": label_build,
+                    "send_method": method
+                })
+            pdf_err = method
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+            if channel == 'pdf':
+                return jsonify({"success": False, "error": "送印失敗：" + pdf_err}), 500
+
+        # 5b. 備選（僅標籤機）：自己把 PDF 點陣化成 ZPL，直送印表機 9100 埠
         if is_label_printer:
             ip = _printer_ip(printer_name)
             if not ip:
@@ -354,50 +354,22 @@ def print_waybill():
                 try:
                     zpl = build_zpl_from_pdf(merged_pdf)
                     send_zpl_via_tcp(zpl, ip)
+                    note = ('；PDF 送印失敗：' + pdf_err) if pdf_err else ''
                     return jsonify({
                         "success": True,
-                        "message": f"已直送 {printer_name} ({print_mode})",
+                        "message": f"已直送 {printer_name} ({print_mode}){note}",
                         "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
                         "mode": print_mode,
-                        "send_method": f"ZPL 直送 {ip}:9100 ({len(zpl)} bytes)"
+                        "build": label_build,
+                        "send_method": f"ZPL 直送 {ip}:9100 ({len(zpl)} bytes){note}"
                     })
                 except Exception as e:
                     zpl_err = str(e)
-        
-        # 5b. 退回：寫暫存檔，交給系統/PDF 處理程式列印
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-            tmp.write(merged_pdf)
-            tmp_path = tmp.name
-        
-        ok, method = send_pdf_to_printer(tmp_path, printer_name)
-        if not ok:
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-            return jsonify({"success": False, "error": "送印失敗：" + method}), 500
-        if zpl_err:
-            method = method + f"（ZPL 直送未用：{zpl_err}）"
-        
-        # 6. 刪除臨時文件（延遲 2 秒確保打印完成）
-        import threading
-        def cleanup():
-            import time
-            time.sleep(2)
-            try:
-                os.remove(tmp_path)
-            except:
-                pass
-        
-        threading.Thread(target=cleanup, daemon=True).start()
-        
-        return jsonify({
-            "success": True,
-            "message": f"已發送到 {printer_name} ({print_mode})",
-            "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo'),
-            "mode": print_mode,
-            "send_method": method
-        })
+
+        return jsonify({"success": False, "error": "送印失敗：%s%s" % (
+            pdf_err,
+            ("；ZPL 直送也失敗：" + zpl_err) if zpl_err else ""
+        )}), 500
         
     except Exception as e:
         import traceback
@@ -480,6 +452,72 @@ def send_zpl_via_tcp(zpl_bytes, ip, port=9100, timeout=120):
         s.sendall(zpl_bytes)
 
 
+# 標籤裁切範圍（PDF 座標，原點左下）：上聯 / 下聯
+#   上聯去掉 "Order created By" 那行；下聯去掉底部殘行
+LABEL_CROPS = [(20, 441.8, 575, 802.0), (0, 42.1, 575, 402.3)]
+LABEL_W_MM, LABEL_H_MM = 102, 210
+
+
+def build_label_pdf_clean(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM):
+    """用 PyMuPDF 重建 2 頁 102x210mm 標籤 PDF（乾淨版，Adobe Reader 相容）。
+
+    為何不用 PyPDF2 的「設 mediabox + transformation」：那種檔 Foxit 印得出來，
+    但 **Adobe Reader 會靜默拒絕**（API 沒報錯、目標印表機佇列卻全程 0 個工作）。
+    show_pdf_page 產生的是標準 page/XObject 引用，Reader 與 Foxit 都能正常列印，
+    視覺結果相同（同樣的裁切框、同樣的縮放）。
+    """
+    import fitz  # PyMuPDF
+    src = fitz.open(stream=pdf_bytes, filetype='pdf')
+    H = src[0].rect.height                 # PDF→PyMuPDF 是上下翻轉，y 要換算
+    w_pt = width_mm * 72 / 25.4
+    h_pt = height_mm * 72 / 25.4
+    out = fitz.open()
+    for (x0, y0, x1, y1) in LABEL_CROPS:
+        clip = fitz.Rect(x0, H - y1, x1, H - y0)
+        page = out.new_page(width=w_pt, height=h_pt)
+        rw, rh = clip.height, clip.width   # 旋轉 90° 後的寬高
+        s = min(w_pt / rw, h_pt / rh)
+        tw, th = rw * s, rh * s
+        target = fitz.Rect((w_pt - tw) / 2, (h_pt - th) / 2,
+                           (w_pt + tw) / 2, (h_pt + th) / 2)
+        page.show_pdf_page(target, src, 0, clip=clip, rotate=90)
+    return out.tobytes()
+
+
+def build_label_pdf_legacy(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM):
+    """舊法（PyPDF2 設 mediabox + transformation）。只在 PyMuPDF 不可用時使用。
+
+    注意：這種輸出 Foxit 能印，但 Adobe Reader 印不出來（佇列沒有工作）。
+    """
+    mm = 72 / 25.4
+    label_w = width_mm * mm
+    label_h = height_mm * mm
+    out = io.BytesIO()
+    writer = PdfWriter()
+
+    def one(crop, fresh_bytes):
+        reader = PdfReader(io.BytesIO(fresh_bytes))
+        page = reader.pages[0]
+        page.mediabox = RectangleObject((crop[0], crop[1], crop[2], crop[3]))
+        rw = crop[3] - crop[1]                 # 旋轉 90° 後寬度 = 原高度
+        rh = crop[2] - crop[0]
+        s = min(label_w / rw, label_h / rh)
+        xo = (label_w - rw * s) / 2
+        yo = (label_h - rh * s) / 2
+        a, b, c, d = 0, -s, s, 0
+        e = -crop[1] * s + xo
+        f = crop[2] * s + yo
+        page.add_transformation(Transformation((a, b, c, d, e, f)))
+        page.mediabox = RectangleObject((0, 0, label_w, label_h))
+        page.cropbox = RectangleObject((0, 0, label_w, label_h))
+        writer.add_page(page)
+
+    for crop in LABEL_CROPS:
+        one(crop, pdf_bytes)
+    writer.write(out)
+    return out.getvalue()
+
+
 def send_pdf_to_printer(file_path, printer_name):
     """把 PDF 送到指定印表機，回傳 (成功, 使用的方法說明)。
 
@@ -510,6 +548,10 @@ def send_pdf_to_printer(file_path, printer_name):
                           .replace('%4', ''))
                 if val:  # 空的佔位符不要傳
                     args.append(val)
+            # Adobe（Reader/Acrobat）：補 /h 避免彈出文件視窗（/h 要放在 /t 之前）
+            if (re.search(r'acrobat|acrord', os.path.basename(exe), re.I)
+                    and '/t' in args and '/h' not in args):
+                args.insert(args.index('/t'), '/h')
             try:
                 r = subprocess.run(args, timeout=180, capture_output=True, text=True,
                                    creationflags=CREATE_NO_WINDOW)
