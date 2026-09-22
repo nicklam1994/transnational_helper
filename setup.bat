@@ -88,6 +88,9 @@ echo   2. Edge will open the teamwork login page
 echo   3. Log in with your account and OTP
 echo   4. The app opens at http://localhost:5000
 echo.
+echo NOTE: this setup stopped any running services first. If the app was
+echo       running before, double-click start_server.bat to start it again.
+echo.
 pause
 exit /b 0
 
