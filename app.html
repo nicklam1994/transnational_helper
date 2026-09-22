@@ -21,6 +21,12 @@
             padding: 20px 0;
             display: flex;
             flex-direction: column;
+            /* 固定在視窗左側：訂單清單很長時，左下角齒輪仍留在畫面底部（不必拉到底） */
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
         }
         .sidebar-logo {
             padding: 0 20px 20px;
@@ -70,6 +76,21 @@
         }
         .nav-menu {
             margin-top: 20px;
+        }
+        /* 側欄分三層（皆不壓縮）：logo / 可滾動導航 / 貼底齒輪
+           這樣任何視窗高度（含矮螢幕、瀏海縮放）齒輪都不會被擠出畫面；
+           100vh 是「視窗高」的相對單位，會隨解析度與縮放自動變化，不是固定像素。 */
+        .sidebar-logo { flex-shrink: 0; }
+        .nav-menu.nav-main {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .nav-menu.sidebar-footer {
+            margin-top: auto;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
         }
         .nav-item {
             padding: 12px 20px;
@@ -941,6 +962,7 @@
         /* --- 側欄 --- */
         body.light .sidebar { background: rgba(255,255,255,0.92); border-right: 1px solid rgba(0,0,0,0.08); }
         body.light .sidebar-logo { border-bottom-color: rgba(0,0,0,0.08); }
+        body.light .nav-menu.sidebar-footer { border-top-color: rgba(0,0,0,0.08); }
         body.light .sidebar-logo p,
         body.light .conn-status { color: #6b7280; }
         body.light .nav-item { color: #374151; }
@@ -1120,7 +1142,7 @@
                 <span id="status-text">檢測中...</span>
             </div>
         </div>
-        <div class="nav-menu">
+        <div class="nav-menu nav-main">
             <div class="nav-item active" onclick="switchPage('orders')">
                 <span class="nav-icon">📦</span>
                 <span class="nav-text">全部訂單</span>
@@ -1143,7 +1165,7 @@
             </div>
         </div>
         <!-- 左下角：設定（齒輪） -->
-        <div class="nav-menu" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+        <div class="nav-menu sidebar-footer">
             <div class="nav-item" onclick="switchPage('settings')">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-text">設定</span>
