@@ -1,0 +1,15 @@
+[4/4] Verifying installation...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import flask, requests, greenlet, PyPDF2; import fitz; import win32print, win32ui, win32con; from PIL import Image, ImageWin; from playwright.sync_api import sync_playwright; print('All imports OK')
+                                              ^^^^^^^^^^^
+  File "C:\transnational_helper\.venv\Lib\site-packages\fitz\__init__.py", line 2, in <module>
+    from pymupdf import *
+  File "C:\transnational_helper\.venv\Lib\site-packages\pymupdf\__init__.py", line 33, in <module>
+    from . import extra
+  File "C:\transnational_helper\.venv\Lib\site-packages\pymupdf\extra.py", line 10, in <module>
+    from . import _extra
+ImportError: DLL load failed while importing _extra: The specified module could not be found.
+
+[ERROR] Import check failed. Packages may be incomplete.
+Try running setup.bat again.

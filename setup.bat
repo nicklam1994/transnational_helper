@@ -1,166 +1,134 @@
 @echo off
-
+chcp 65001 >nul
 setlocal enabledelayedexpansion
-
 cd /d "%~dp0"
 
-
-
 echo ==========================================
-
 echo   Teamwork Helper - Environment Setup
-
 echo ==========================================
-
 echo.
 
+:: ---------- Step 0: stop services so files are not locked ----------
+echo [0/5] Stopping running services, to avoid locked files ...
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":5000" ^| findstr "LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -like '*server.py*' -or $_.CommandLine -like '*keepalive_service.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
+ping -n 3 127.0.0.1 >nul
+echo [OK] Services stopped
+echo.
 
-
-:: ---------- Step 1: Find Python 3 ----------
-
-echo [1/4] Looking for Python 3...
-
+:: ---------- Step 1: find a suitable Python 3 ----------
+echo [1/5] Looking for Python 3 - prefer 3.12 / 3.13 ...
 set "PYTHON="
-
-
-
-for /f "delims=" %%i in ('py -3 -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON=%%i"
-
-if not defined PYTHON (
-
-    for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON=%%i"
-
-)
-
-if not defined PYTHON (
-
-    echo.
-
-    echo [ERROR] Python 3 not found.
-
-    echo Please install Python 3.10 or newer from:
-
-    echo   https://www.python.org/downloads/
-
-    echo IMPORTANT: tick "Add python.exe to PATH" during install.
-
-    echo.
-
-    pause
-
-    exit /b 1
-
-)
-
+call :detect 3.12
+call :detect 3.13
+call :detect 3.11
+call :detect 3.10
+call :detect 3
+if defined PYTHON goto :py_found
+for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON=%%i"
+:py_found
+if not defined PYTHON goto :find_python_fail
+for /f "delims=" %%v in ('"%PYTHON%" -c "import sys; print(sys.version.split()[0])" 2^>nul') do set "PYVER=%%v"
 echo [OK] Python found: %PYTHON%
-
-
-
-:: ---------- Step 2: Create venv ----------
-
+echo      Version: %PYVER%
 echo.
 
-echo [2/4] Creating virtual environment (.venv)...
+:: ---------- Step 2: create / keep venv ----------
+echo [2/5] Preparing virtual environment .venv ...
+set "VENV_NEW="
+if exist ".venv\Scripts\python.exe" goto :venv_ready
+"%PYTHON%" -m venv .venv
+if errorlevel 1 goto :venv_fail
+set "VENV_NEW=1"
+echo [OK] .venv created
 
-if not exist ".venv\Scripts\python.exe" (
+:venv_ready
+if defined VENV_NEW goto :venv_show
+echo [OK] Existing .venv kept
 
-    "%PYTHON%" -m venv .venv
-
-    if errorlevel 1 (
-
-        echo [ERROR] Failed to create venv
-
-        pause
-
-        exit /b 1
-
-    )
-
-)
-
-echo [OK] venv ready
-
-
-
-:: ---------- Step 3: Install packages ----------
-
+:venv_show
+".venv\Scripts\python.exe" -c "import sys; print('      venv Python:', sys.version.split()[0])"
 echo.
 
-echo [3/4] Installing packages (flask, requests, playwright, PyPDF2, PyMuPDF, pywin32, pillow)...
-".venv\Scripts\python.exe" -m pip install --no-cache-dir --upgrade pip
-if errorlevel 1 goto :install_fail
-".venv\Scripts\python.exe" -m pip install --no-cache-dir flask flask-cors requests playwright PyPDF2 pymupdf pywin32 pillow
+:: ---------- Step 3: install packages ----------
+echo [3/5] Installing packages ...
+echo       flask, flask-cors, requests, playwright, PyPDF2, pywin32, pillow, pymupdf
+".venv\Scripts\python.exe" -m pip install --no-cache-dir --upgrade pip >nul 2>&1
+".venv\Scripts\python.exe" -m pip install --no-cache-dir --upgrade --only-binary=:all: flask flask-cors requests playwright PyPDF2 pywin32 pillow pymupdf==1.28.2
+if errorlevel 1 goto :try_plain
+echo [OK] Packages installed
+goto :deps
+
+:try_plain
+echo.
+echo [WARN] Wheel-only install failed, retrying without --only-binary ...
+".venv\Scripts\python.exe" -m pip install --no-cache-dir --upgrade flask flask-cors requests playwright PyPDF2 pywin32 pillow pymupdf
 if errorlevel 1 goto :install_fail
 echo [OK] Packages installed
 
-
-:: ---------- Step 4: Verify ----------
-
+:: ---------- Step 4: verify, auto-repair if broken ----------
+:deps
+echo.
+echo [4/5] Verifying dependencies, auto-repair if something is broken ...
+echo.
+".venv\Scripts\python.exe" check_deps.py
+if errorlevel 1 goto :deps_fail
 echo.
 
-echo [4/4] Verifying installation...
-
-".venv\Scripts\python.exe" -c "import flask, requests, greenlet, PyPDF2; import fitz; import win32print, win32ui, win32con; from PIL import Image, ImageWin; from playwright.sync_api import sync_playwright; print('All imports OK')"
-
-if errorlevel 1 goto :verify_fail
-
-echo [OK] Everything installed successfully
-
+:: ---------- Step 5: done ----------
+echo [5/5] Setup complete.
 echo.
-
 echo ==========================================
-
-echo   Setup complete!
-
+echo   Setup complete
 echo ==========================================
-
 echo.
-
 echo Next steps:
-
 echo   1. Double-click start_server.bat
-
 echo   2. Edge will open the teamwork login page
-
 echo   3. Log in with your account and OTP
-
 echo   4. The app opens at http://localhost:5000
-
 echo.
-
 pause
-
 exit /b 0
 
 
+:find_python_fail
+echo.
+echo [ERROR] Python 3 not found.
+echo Please install Python 3.12 or newer from:
+echo   https://www.python.org/downloads/
+echo IMPORTANT: tick "Add python.exe to PATH" during install.
+echo.
+pause
+exit /b 1
+
+:venv_fail
+echo.
+echo [ERROR] Failed to create the virtual environment.
+echo Check disk space and permissions, then run setup.bat again.
+echo.
+pause
+exit /b 1
 
 :install_fail
-
 echo.
-
 echo [ERROR] Package installation failed.
-
 echo Check your internet connection and try again.
-
 echo.
-
 pause
+exit /b 1
 
+:deps_fail
+echo.
+echo [ERROR] Dependency check failed. See the messages above.
+echo Run repair_deps.bat to do a clean re-install.
+echo.
+pause
 exit /b 1
 
 
-
-:verify_fail
-
-echo.
-
-echo [ERROR] Import check failed. Packages may be incomplete.
-
-echo Try running setup.bat again.
-
-echo.
-
-pause
-
-exit /b 1
-
+:: ---------- helper: set PYTHON if this launcher version exists ----------
+:detect
+if defined PYTHON goto :eof
+for /f "delims=" %%i in ('py -%~1 -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON=%%i"
+goto :eof

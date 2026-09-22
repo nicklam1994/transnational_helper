@@ -32,7 +32,7 @@ echo [1/5] Closing existing Edge...
 tasklist | findstr /i "msedge.exe" >nul
 if %errorlevel% equ 0 (
     taskkill /F /IM msedge.exe >nul 2>&1
-    timeout /t 2 /nobreak >nul
+    ping -n 3 127.0.0.1 >nul
     echo [OK] Edge closed
 ) else (
     echo [OK] Edge not running, skip close
@@ -41,19 +41,19 @@ if %errorlevel% equ 0 (
 echo.
 echo [2/5] Starting Edge debug mode (port 9222)...
 start "" "%EDGE%" --remote-debugging-port=9222 --user-data-dir="%TEMP%\edge-debug" "https://hk-teamwork.transnational-grp.com/"
-timeout /t 3 /nobreak >nul
+ping -n 4 127.0.0.1 >nul
 echo [OK] Edge started with debug mode
 
 echo.
 echo [3/5] Starting Keepalive Service...
 start "Keepalive Service" cmd /k "%~dp0.venv\Scripts\python.exe keepalive_service.py"
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 echo [OK] Keepalive started
 
 echo.
 echo [4/5] Starting Teamwork Server...
 start "Teamwork Server" cmd /k "%~dp0.venv\Scripts\python.exe server.py"
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 echo [OK] Server started
 
 echo.

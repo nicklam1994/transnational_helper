@@ -25,7 +25,7 @@ except Exception as _e:
 
 # 標籤機直送需要 PyMuPDF（把 PDF 點陣化成 ZPL）；缺少時退回系統列印路徑
 try:
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF（用 pymupdf 名稱匯入，避免 fitz 相容層的 deprecation 警告）
     ZPL_OK = True
     ZPL_ERR = ''
 except Exception as _e:
@@ -426,7 +426,7 @@ def build_zpl_from_pdf(pdf_bytes, width_mm=102, height_mm=210, dpmm=8, threshold
     完全不依賴任何 PDF 閱讀程式或 Windows 驅動，任何電腦都能用。
     dpmm=8 對應 ZD420 的 203dpi（8 dots/mm）。
     """
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF（用 pymupdf 名稱匯入，避免 fitz 相容層的 deprecation 警告）
     w = int(round(width_mm * dpmm))
     h = int(round(height_mm * dpmm))
     bpr = (w + 7) // 8                     # 每列位元組數
@@ -477,7 +477,7 @@ def build_label_pdf_clean(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM):
     print_pdf_via_gdi 的點陣化直接吃這個輸出。
     （PyPDF2「設 mediabox + transformation」的舊構造已不再採用。）
     """
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF（用 pymupdf 名稱匯入，避免 fitz 相容層的 deprecation 警告）
     src = fitz.open(stream=pdf_bytes, filetype='pdf')
     H = src[0].rect.height                 # PDF→PyMuPDF 是上下翻轉，y 要換算
     w_pt = width_mm * 72 / 25.4
@@ -560,7 +560,7 @@ def print_pdf_via_gdi(pdf_bytes, printer_name, doc_name='Waybill', threshold=INK
     呼叫端需以 _PRINT_LOCK 序列化（GDI 對同一印表機非執行緒安全）。
     """
     import io
-    import fitz
+    import pymupdf as fitz
     import win32ui, win32con
     from PIL import Image, ImageWin
 

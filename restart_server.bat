@@ -17,12 +17,12 @@ for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":5000" ^| findstr "LISTENING
     taskkill /F /PID %%p >nul 2>&1
 )
 
-timeout /t 1 /nobreak >nul
+ping -n 2 127.0.0.1 >nul
 echo [OK] Old server stopped
 
 start "Teamwork Server" cmd /k "%~dp0.venv\Scripts\python.exe server.py"
 
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 echo [OK] New server started
 echo [OK] Refresh http://localhost:5000
 echo.
