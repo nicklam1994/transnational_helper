@@ -21,6 +21,15 @@ Teamwork 訂單管理系統 - 本地 Flask Web 應用，提供訂單查看、報
 - Token 即將過期時自動觸發刷新（模擬用戶點擊）
 - 寫入 `token.json` 供後端使用
 
+### 🖨️ 運單列印（完全靜默、不需任何 PDF 程式）
+- **原單 (A4)**：Teamwork 收據 PDF 以 300dpi 點陣化，經 Windows 印表機驅動 **GDI 直印** → 指定 A4 印表機，1 張
+- **標籤機**：A4 兩聯自動切開、旋轉縮放成 102×210mm → **GDI 直印** → 指定標籤機，2 張
+- **標簽機 (ZPL)**：程式自行點陣化成 ZPL，**直送印表機 raw 埠 9100**（不經 Windows 驅動）
+- 三種模式都 **無對話框、無彈窗**，且 **不需要** Adobe Reader / Foxit / 任何 PDF 閱讀程式
+- 列印前請先在左下 ⚙️ **設定** 選好「原始運單打印機 (A4)」「標籤運單打印機 (Label)」與標籤機 IP
+- 驗證送印：A4／標籤走 Windows 佇列（`Get-PrintJob -PrinterName "<印表機>"`）；
+  ZPL 直送不進佇列，用印表機查詢（`~HI` / `~HS`）
+
 ## 安裝步驟
 
 ### 1. 環境準備
@@ -32,7 +41,7 @@ Teamwork 訂單管理系統 - 本地 Flask Web 應用，提供訂單查看、報
 雙擊 `setup.bat`，會自動：
 - 檢測 Python 環境
 - 創建虛擬環境 `.venv`
-- 安裝依賴套件（flask, flask-cors, requests, playwright）
+- 安裝依賴套件（flask, flask-cors, requests, playwright, PyPDF2, PyMuPDF, pywin32, pillow）
 
 ### 3. 啟動 Edge Debug 模式
 雙擊 `start_server.bat` 會自動啟動 Edge（帶 `--remote-debugging-port=9222`）

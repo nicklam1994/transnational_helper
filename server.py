@@ -277,12 +277,12 @@ def print_waybill():
         label_build = ''
         if is_label_printer:
             # 標籤機：切成兩張 102x210mm
-            #   優先用 PyMuPDF 重建乾淨版（Adobe Reader 只吃這種構造），
-            #   失敗才退回 PyPDF2 舊法（Reader 印不出，但 Foxit 可以）
+            #   優先用 PyMuPDF 重建標準 2 頁 PDF（GDI 點陣化的來源），
+            #   PyMuPDF 不可用時才退回 PyPDF2 舊法
             if ZPL_OK:
                 try:
                     merged_pdf = build_label_pdf_clean(pdf_response.content)
-                    label_build = 'PyMuPDF 重建（Reader 相容）'
+                    label_build = 'PyMuPDF 重建（標準 2 頁）'
                 except Exception as e:
                     merged_pdf = build_label_pdf_legacy(pdf_response.content)
                     label_build = 'PyPDF2 舊法（PyMuPDF 重建失敗: %s）' % e
@@ -292,7 +292,7 @@ def print_waybill():
             page_count = 2
             print_mode = "標籤模式（2張）"
         else:
-            # 普通打印機：原檔 1:1 直出，不改寫 PDF（Reader/Foxit 都最不會出問題）
+            # 普通打印機：原檔 1:1 直出，不改寫 PDF（GDI 點陣化最忠實）
             merged_pdf = pdf_response.content
             try:
                 page_count = len(PdfReader(io.BytesIO(merged_pdf)).pages)
@@ -459,12 +459,11 @@ LABEL_W_MM, LABEL_H_MM = 102, 210
 
 
 def build_label_pdf_clean(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM):
-    """用 PyMuPDF 重建 2 頁 102x210mm 標籤 PDF（乾淨版，Adobe Reader 相容）。
+    """用 PyMuPDF 重建 2 頁 102x210mm 標籤 PDF（標準構造）。
 
-    為何不用 PyPDF2 的「設 mediabox + transformation」：那種檔 Foxit 印得出來，
-    但 **Adobe Reader 會靜默拒絕**（API 沒報錯、目標印表機佇列卻全程 0 個工作）。
-    show_pdf_page 產生的是標準 page/XObject 引用，Reader 與 Foxit 都能正常列印，
-    視覺結果相同（同樣的裁切框、同樣的縮放）。
+    show_pdf_page 產生標準 page/XObject 引用，裁切框與縮放完全一致；
+    print_pdf_via_gdi 的點陣化直接吃這個輸出。
+    （PyPDF2「設 mediabox + transformation」的舊構造已不再採用。）
     """
     import fitz  # PyMuPDF
     src = fitz.open(stream=pdf_bytes, filetype='pdf')
@@ -487,7 +486,8 @@ def build_label_pdf_clean(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM):
 def build_label_pdf_legacy(pdf_bytes, width_mm=LABEL_W_MM, height_mm=LABEL_H_MM):
     """舊法（PyPDF2 設 mediabox + transformation）。只在 PyMuPDF 不可用時使用。
 
-    注意：這種輸出 Foxit 能印，但 Adobe Reader 印不出來（佇列沒有工作）。
+    注意：PyMuPDF 同時是 GDI 點陣化的來源，缺少它時整條列印路都不通，
+    所以此路徑實務上只是防呆，不會真的走到。
     """
     mm = 72 / 25.4
     label_w = width_mm * mm
@@ -524,14 +524,14 @@ GDI_DPI = 300
 _PRINT_LOCK = threading.Lock()
 
 
-def print_pdf_via_gdi(pdf_bytes, printer_name, dpi=GDI_DPI, doc_name='德安運單'):
+def print_pdf_via_gdi(pdf_bytes, printer_name, dpi=GDI_DPI, doc_name='Waybill'):
     """PyMuPDF 點陣化 → pywin32 GDI 直接列印。回傳實際送出的頁數。
 
-    為何用這條路（2026-09-21 實測定案）：
-      - Adobe `/t`：會短暫彈窗；且 returncode 不可靠（成功也可能回 1），害我們誤判失敗
-        又去試 ShellExecute → 同一份工作送兩次（快速列印印出 4 張就是這樣來的）。
-      - ShellExecute `-Verb PrintTo`：不會把印表機名傳進 PDF 程式，還會彈窗、掉工作。
-      - GDI：無外部程式、無對話框、1 頁約 0.4 秒，連送 4 份全部進佇列（實測零遺失）。
+    為何用這條路（2026-09-21 實測定案，已完全取代 PDF 閱讀程式路徑）：
+      - GDI：無外部程式、無對話框、1 頁約 0.4 秒，批量連送全部進佇列（實測零遺失）。
+      - 舊路徑已廢棄（勿回頭用）：Adobe `/t` 會短暫彈窗、returncode 不可靠（成功也可能回 1），
+        曾害程式誤判失敗又送一次（快速列印印出 4 張）；ShellExecute `-Verb PrintTo`
+        不會把印表機名傳進 PDF 程式，會彈窗且掉工作。
     EndDoc 會等 spooler 收下工作，所以回傳成功 = 真的進佇列。
     """
     import io

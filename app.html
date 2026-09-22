@@ -1534,7 +1534,7 @@
                         <option value="">（未設定）</option>
                     </select>
                 </div>
-                <div class="settings-hint">走 Windows 驅動：Adobe Reader <code>/h /t</code> 靜默送印，可指定印表機。</div>
+                <div class="settings-hint">經 Windows 印表機驅動直送：PDF 以 300dpi 點陣化後用 <b>GDI 直接列印</b>，無對話框、無彈窗；<b>不需</b> Adobe / Foxit 等任何 PDF 程式。</div>
                 <div class="settings-actions">
                     <button class="btn btn-secondary btn-sm" onclick="reloadPrintersInSettings()">🔄 重新載入打印機清單</button>
                 </div>
@@ -1551,7 +1551,7 @@
                     <label>埠 Port</label>
                     <input type="text" id="set-zpl-port" class="settings-input" placeholder="9100" value="9100">
                 </div>
-                <div class="settings-hint">不經 Windows 驅動，直接把 ZPL 送到印表機 raw 埠（預設 9100）。</div>
+                <div class="settings-hint">不經 Windows 驅動，直接把 ZPL 送到印表機 raw 埠（預設 9100）；此路徑同樣不需任何 PDF 程式。</div>
             </div>
             
             <div class="settings-actions">
@@ -2099,13 +2099,13 @@
             let txt;
             if (t.mode === 'a4') {
                 txt = '印表機：' + (s.a4Printer || '（未設定 → 請到左下「設定」選擇）')
-                    + ' — 走 Windows 驅動，原始 A4 運單一張';
+                    + ' — GDI 直印（經印表機驅動），原始 A4 運單一張';
             } else if (t.mode === 'label-zpl') {
                 txt = 'ZPL 直送 ' + (s.zplIp || '（未設定 IP → 請到左下「設定」填寫）')
-                    + ':' + (s.zplPort || '9100') + ' — 不經 Windows 驅動';
+                    + ':' + (s.zplPort || '9100') + ' — ZPL 直送，不經驅動';
             } else {
                 txt = '印表機：' + (s.labelPrinter || '（未設定 → 請到左下「設定」選擇）')
-                    + ' — 走 Windows 驅動，102x210 兩張';
+                    + ' — GDI 直印（經印表機驅動），102x210 兩張';
             }
             el.textContent = txt;
         }
@@ -2137,7 +2137,7 @@
         }
         
         async function quickPrintWaybill(invoiceId, button) {
-            // 快速列印 = 標籤運單打印機（走 Windows 驅動，102x210 兩張）
+            // 快速列印 = 標籤運單打印機（GDI 直印，102x210 兩張）
             const s = getSettings();
             const printer = s.labelPrinter;
             if (!printer) {
