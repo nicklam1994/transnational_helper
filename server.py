@@ -128,6 +128,61 @@ def api_headers():
         "referer": "https://hk-teamwork.transnational-grp.com/"
     }
 
+
+API_BASE = "https://hk-teamwork-api-rp.transnational-grp.com"
+
+# ── 官方 Order Form（運單）PDF ─────────────────────────────────────────────
+# 與官方 App 完全相同的端點與 payload（由官方 main.dart.js 反推並實測）：
+#   GetOrderFormA4File  ← {"OrderNo": <no>, "NumCopy": 2}   （官方 console: "User selected A4 Order Form"）
+#   GetOrderFormA6File  ← {"OrderNo": <no>}                  （官方 console: "User selected A6 Shipping Label"）
+# 回應為原始 PDF bytes（官方 App 直接 createObjectURL(..., 'application/pdf') 開新分頁）。
+ORDERFORM_PATHS = {
+    'a4': '/api/OrderForm/GetOrderFormA4File',
+    'a6': '/api/OrderForm/GetOrderFormA6File',
+}
+
+
+def fetch_orderform_pdf(order_no, size='a4', num_copy=2, timeout=60):
+    """呼叫官方 Order Form 端點取回 PDF bytes。size: 'a4' | 'a6'"""
+    path = ORDERFORM_PATHS.get(size)
+    if not path:
+        raise ValueError('未知的 Order Form 尺寸: %s' % size)
+    headers = api_headers()
+    if not headers:
+        raise RuntimeError('無法獲取 token')
+    body = {"OrderNo": order_no}
+    if size == 'a4':
+        body["NumCopy"] = num_copy          # 官方 A4 固定要 2 份
+    r = requests.post(API_BASE + path, json=body, headers=headers, timeout=timeout)
+    if r.status_code != 200:
+        raise RuntimeError('HTTP %d' % r.status_code)
+    content = r.content or b''
+    if content[:4] == b'%PDF':
+        return content
+    # 保險：若端點改回 JSON（Result 內含 base64）也能處理
+    try:
+        j = r.json()
+    except Exception:
+        raise RuntimeError('回應不是 PDF（%d bytes, Content-Type=%s）'
+                           % (len(content), r.headers.get('Content-Type')))
+    import base64
+    for key in ('Result', 'result', 'File', 'file', 'Data', 'data'):
+        v = j.get(key) if isinstance(j, dict) else None
+        if isinstance(v, str) and len(v) > 100:
+            try:
+                raw = base64.b64decode(v)
+            except Exception:
+                continue
+            if raw[:4] == b'%PDF':
+                return raw
+    raise RuntimeError('回應不是 PDF：%s' % str(j)[:200])
+
+
+def _is_label_printer_name(printer_name):
+    """依印表機名稱判斷是否標籤機（舊版 channel 相容邏輯用）"""
+    u = (printer_name or '').upper()
+    return ('ZD' in u) or ('LABEL' in u)
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'app.html')
@@ -207,17 +262,36 @@ def print_waybill():
     data = request.json or {}
     invoice_id = data.get('InvoiceId')
     printer_name = (data.get('printer') or '').strip()
-    # channel: auto（先 PDF 再 ZPL）| pdf（只走 PDF 處理程式）| zpl（只用 ZPL 直送，不需印表機名）
-    channel = str(data.get('channel') or 'auto').lower()
+    # source ：receipt（訂單收據 receiptFile）| orderform（官方 Order Form API）
+    source = str(data.get('source') or '').lower()
+    # doc    ：a4（整張）| label（標籤尺寸：收據 = A4 對切 2 聯；運單 = 官方 A6 標籤）
+    doc = str(data.get('doc') or '').lower()
+    # transport：gdi（經 Windows 驅動直印）| zpl（網絡 raw 埠直通）
+    transport = str(data.get('transport') or '').lower()
+    # 舊版相容：channel = auto | pdf | zpl（新前端不再送）
+    channel = str(data.get('channel') or '').lower()
     zpl_ip_req = (data.get('zpl_ip') or '').strip()
     try:
         zpl_port_req = int(data.get('zpl_port') or 9100)
     except Exception:
         zpl_port_req = 9100
 
+    if not source:
+        source = 'receipt'
+    if source not in ('receipt', 'orderform'):
+        return jsonify({"success": False, "error": "source 只接受 receipt / orderform"}), 400
+    if not transport:
+        transport = 'zpl' if channel == 'zpl' else 'gdi'
+    if transport not in ('gdi', 'zpl'):
+        return jsonify({"success": False, "error": "transport 只接受 gdi / zpl"}), 400
+    if not doc:
+        doc = 'label' if (transport == 'zpl' or _is_label_printer_name(printer_name)) else 'a4'
+    if doc not in ('a4', 'label'):
+        return jsonify({"success": False, "error": "doc 只接受 a4 / label"}), 400
+
     if not invoice_id:
         return jsonify({"success": False, "error": "缺少 InvoiceId"}), 400
-    if not printer_name and channel != 'zpl':
+    if not printer_name and transport != 'zpl':
         return jsonify({"success": False, "error": "缺少 printer 參數（列印機）"}), 400
     
     if not PDF_LIB_OK:
@@ -226,10 +300,8 @@ def print_waybill():
             "error": "伺服器缺少 PyPDF2，無法處理列印。請執行 pip install PyPDF2 後重啟（詳情：" + PDF_LIB_ERR + "）"
         }), 500
     
-    # 判斷是否為標籤打印機（channel=zpl 時一律視為標籤模式）
-    is_label_printer = ('ZD' in printer_name.upper()
-                        or 'LABEL' in printer_name.upper()
-                        or channel == 'zpl')
+    # 標籤模式即 doc='label'（frontend 決定；舊版 channel=zpl 亦已在上方映射成 label）
+    is_label_printer = (doc == 'label')
     
     try:
         # 1. 獲取訂單詳情
@@ -267,38 +339,66 @@ def print_waybill():
         if not receipt_url:
             return jsonify({"success": False, "error": "沒有收據文件"}), 400
         
-        # 2. 下載 PDF 到內存
-        pdf_response = requests.get(receipt_url, headers=headers, timeout=30)
-        if pdf_response.status_code != 200:
-            return jsonify({"success": False, "error": f"下載 PDF 失敗: {pdf_response.status_code}"}), 500
-        
+        order_no = order_row.get('OrderNo') or order_detail.get('OrderNo')
+
         import io
-        
+
+        # 2. 取 PDF 到內存
+        if source == 'orderform':
+            if not order_no:
+                return jsonify({"success": False, "error": "訂單沒有 OrderNo，無法產生 Order Form"}), 400
+            form_size = 'a6' if is_label_printer else 'a4'
+            try:
+                pdf_bytes = fetch_orderform_pdf(order_no, size=form_size)
+            except Exception as e:
+                return jsonify({"success": False, "error": "取得官方 Order Form 失敗：" + str(e)}), 500
+            src_desc = '官方 Order Form %s' % form_size.upper()
+        else:
+            if not receipt_url:
+                return jsonify({"success": False, "error": "沒有收據文件"}), 400
+            pdf_response = requests.get(receipt_url, headers=headers, timeout=30)
+            if pdf_response.status_code != 200:
+                return jsonify({"success": False, "error": f"下載 PDF 失敗: {pdf_response.status_code}"}), 500
+            pdf_bytes = pdf_response.content
+            src_desc = '訂單收據'
+
+        # 3. 依 doc 構造列印頁面
         label_build = ''
         if is_label_printer:
-            # 標籤機：切成兩張 102x210mm
-            #   優先用 PyMuPDF 重建標準 2 頁 PDF（GDI 點陣化的來源），
-            #   PyMuPDF 不可用時才退回 PyPDF2 舊法
-            if ZPL_OK:
+            if source == 'orderform':
+                # 官方 A6 本身已是標籤尺寸（官方 console 就叫 "A6 Shipping Label"），
+                # 直接用，不做 A4 對切。
+                merged_pdf = pdf_bytes
+                label_build = 'Order Form A6 原尺寸（不裁切）'
                 try:
-                    merged_pdf = build_label_pdf_clean(pdf_response.content)
-                    label_build = 'PyMuPDF 重建（標準 2 頁）'
-                except Exception as e:
-                    merged_pdf = build_label_pdf_legacy(pdf_response.content)
-                    label_build = 'PyPDF2 舊法（PyMuPDF 重建失敗: %s）' % e
+                    page_count = len(PdfReader(io.BytesIO(merged_pdf)).pages)
+                except Exception:
+                    page_count = 1
+                print_mode = "運單(Label) A6 標籤模式"
             else:
-                merged_pdf = build_label_pdf_legacy(pdf_response.content)
-                label_build = 'PyPDF2 舊法（PyMuPDF 不可用）'
-            page_count = 2
-            print_mode = "標籤模式（2張）"
+                # 收據：A4 對切成兩張 102x210mm
+                #   優先用 PyMuPDF 重建標準 2 頁 PDF（GDI 點陣化的來源），
+                #   PyMuPDF 不可用時才退回 PyPDF2 舊法
+                if ZPL_OK:
+                    try:
+                        merged_pdf = build_label_pdf_clean(pdf_bytes)
+                        label_build = 'PyMuPDF 重建（標準 2 頁）'
+                    except Exception as e:
+                        merged_pdf = build_label_pdf_legacy(pdf_bytes)
+                        label_build = 'PyPDF2 舊法（PyMuPDF 重建失敗: %s）' % e
+                else:
+                    merged_pdf = build_label_pdf_legacy(pdf_bytes)
+                    label_build = 'PyPDF2 舊法（PyMuPDF 不可用）'
+                page_count = 2
+                print_mode = "收據(Label) 2 張模式"
         else:
             # 普通打印機：原檔 1:1 直出，不改寫 PDF（GDI 點陣化最忠實）
-            merged_pdf = pdf_response.content
+            merged_pdf = pdf_bytes
             try:
                 page_count = len(PdfReader(io.BytesIO(merged_pdf)).pages)
             except Exception:
                 page_count = 1
-            print_mode = "A4 整張模式"
+            print_mode = ("運單(A4) 整張模式" if source == 'orderform' else "收據(A4) 整張模式")
         
         # 乾跑模式：只驗證 PDF/ZPL 產生結果，不送印（測試用）
         try:
@@ -306,20 +406,26 @@ def print_waybill():
             _dims = '%.0fx%.0fpt' % (float(_pg0.mediabox.width), float(_pg0.mediabox.height))
         except Exception:
             _dims = '?'
-        print("[print] order=%s printer=%r channel=%s mode=%s pages=%s build=%s pdf=%s pagesize=%s dry=%s"
-              % (invoice_id, printer_name, channel, print_mode, page_count, label_build or '-',
-                 len(merged_pdf), _dims, bool(data.get('dry_run'))), flush=True)
+        print("[print] order=%s pr=%r source=%s doc=%s transport=%s mode=%s pages=%s build=%s "
+              "pdf=%s pagesize=%s dry=%s"
+              % (invoice_id, printer_name, source, doc, transport, print_mode, page_count,
+                 label_build or '-', len(merged_pdf), _dims, bool(data.get('dry_run'))), flush=True)
 
         if data.get('dry_run'):
             info = {
                 "success": True,
                 "dry_run": True,
+                "source": source,
+                "src_desc": src_desc,
+                "doc": doc,
+                "transport": transport,
                 "mode": print_mode,
                 "pages": page_count,
                 "pdf_bytes": len(merged_pdf),
+                "pdf_pagesize": _dims,
                 "build": label_build,
                 "printer": printer_name,
-                "order_no": order_row.get('OrderNo') or order_detail.get('OrderNo')
+                "order_no": order_no
             }
             if is_label_printer:
                 ip = zpl_ip_req or _printer_ip(printer_name)
@@ -333,18 +439,17 @@ def print_waybill():
                     info['zpl_error'] = 'PyMuPDF 不可用'
             return jsonify(info)
         
-        # 送印方式（2026-09-21 改為原生路徑，完全移除 Adobe / Foxit / ShellExecute）：
-        #   channel='zpl'  → ZPL 直送印表機 raw 埠（標籤機，不經 Windows 驅動）
-        #   channel='pdf'  → pywin32 GDI 直接列印（A4 與標籤機皆可，無對話框）
-        #   channel='auto' → 標籤機走 ZPL，其餘走 GDI
-        use_zpl = (channel == 'zpl') or (channel == 'auto' and is_label_printer)
-        order_no = order_row.get('OrderNo') or order_detail.get('OrderNo') or str(invoice_id)
+        # 送印方式（2026-09-21 起全程原生路徑，完全移除 Adobe / Foxit / ShellExecute）：
+        #   transport='zpl' → ZPL 直送印表機 raw 埠（不經 Windows 驅動）
+        #   transport='gdi' → pywin32 GDI 直接列印（A4 與標籤機皆可，無對話框）
+        order_no = order_no or str(invoice_id)
 
-        if use_zpl:
+        if transport == 'zpl':
             ip = zpl_ip_req or _printer_ip(printer_name)
             if not ip:
                 return jsonify({"success": False, "error":
-                                "ZPL 直送需要印表機 IP：請在「設定 → 網絡 (IP)」填寫，或選含 IP 的印表機名稱"}), 400
+                                "ZPL 直送需要印表機 IP：請在「設定 → 打印機設定 → Label 打印機 → 網絡 (IP)」填寫，"
+                                "或選含 IP 的印表機名稱"}), 400
             if not ZPL_OK:
                 return jsonify({"success": False, "error": "ZPL 直送需要 PyMuPDF：" + ZPL_ERR}), 500
             try:
@@ -1037,7 +1142,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print("\n功能:")
     print("  ✓ 訂單詳情（搜索、過濾、統計）")
-    print("  ✓ 運單列印（A4 / 標籤機：GDI 直印；標簽機 ZPL：直送 IP:埠）")
+    print("  ✓ 運單列印（收據(A4) / 收據(Label) / 運單(A4) / 運單(Label)）")
+    print("      Label 打印機可二選一：本地打印機（GDI 直印）或 網絡 (IP) ZPL 直通")
     print("  ✓ 物流查詢")
     print("  ✓ Token 從 token.json 自動讀取")
     print("\n環境:")

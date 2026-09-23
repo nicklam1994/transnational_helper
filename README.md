@@ -10,13 +10,24 @@ Teamwork 訂單管理系統 - 本地 Flask Web 應用，提供訂單查看、報
 - **物流查詢**：追蹤訂單物流狀態
 
 ### 🖨️ 運單列印（完全靜默、不需任何 PDF 程式）
-- **原單 (A4)**：Teamwork 收據 PDF 以印表機原生 DPI 等比縮放，經 Windows 印表機驅動 **GDI 直印** → 指定 A4 印表機，1 張
-- **標籤機**：A4 兩聯自動切開、旋轉縮放成 102×210mm → **GDI 直印** → 指定標籤機，2 張
-- **標簽機 (ZPL)**：程式自行點陣化成 ZPL，**直送印表機 raw 埠 9100**（不經 Windows 驅動）
-- 三種模式都 **無對話框、無彈窗**，且 **不需要** Adobe Reader / Foxit / 任何 PDF 閱讀程式
-- 列印前請先在左下 ⚙️ **設定** 選好「原始運單打印機 (A4)」「標籤運單打印機 (Label)」與標籤機 IP
-- **新單監聽自動列印**：開啟後自動偵測新訂單並列印（預設原單 A4，可切換標籤機/ZPL），每 20 秒檢查一次
-- 驗證送印：A4／標籤走 Windows 佇列（`Get-PrintJob -PrinterName "<印表機>"`）；
+
+**列印方式和類型（4 種）＝ 文件來源 × 紙張尺寸**
+
+| 列印方式 | 文件來源（皆為官方文件） | 紙張 | 輸出 |
+|---|---|---|---|
+| **收據(A4)** | 訂單收據（`receiptFile`） | A4 210×297mm | A4 打印機，1 張 |
+| **收據(Label)** | 訂單收據（`receiptFile`） | 102×210mm | Label 打印機，2 張（A4 對切兩聯） |
+| **運單(A4)** | 官方 Order Form `GetOrderFormA4File` | A4 210×297mm | A4 打印機，1 張 |
+| **運單(Label)** | 官方 Order Form `GetOrderFormA6File` | A6 105×148mm | Label 打印機，1 張（官方 A6 航運標籤，不裁切） |
+
+- 「收據」= 官方訂單收據（簽收憑證／POD）；「運單」= 官方 App「Order Form」按鈕輸出的同一份文件
+  （端點與 payload 與官方 App 完全一致：`{"OrderNo", "NumCopy":2}` / `{"OrderNo"}`）
+- **Label 打印機可二選一**（在 ⚙️ 設定 → 打印機設定）：
+  1. **本地打印機**：經 Windows 驅動以 **GDI 直接列印**（無對話框、無彈窗）
+  2. **網絡 (IP) — ZPL 直通**：程式自行點陣化成 ZPL，**直送印表機 raw 埠 9100**（不經 Windows 驅動）
+- 所有路徑都 **不需要** Adobe Reader / Foxit / 任何 PDF 閱讀程式
+- **新單監聽自動列印**：開啟後自動偵測新訂單並列印（可選 4 種列印方式），每 20 秒檢查一次
+- 驗證送印：本地路徑走 Windows 佇列（`Get-PrintJob -PrinterName "<印表機>"`）；
   ZPL 直送不進佇列，用印表機查詢（`~HI` / `~HS`）
 
 ### 📍 地址管理
@@ -89,15 +100,22 @@ restart_keepalive.bat     # 只啟動 Keepalive
 
 ### 運單列印
 1. 點擊左側選單「🖨️ 運單列印」
-2. 選擇列印方式：原單 (A4) / 標籤機 / 標簽機 (ZPL)
+2. 選擇**列印方式和類型**：收據(A4) / 收據(Label) / 運單(A4) / 運單(Label)（預設收據(A4)）
 3. 搜尋訂單（支持逗號分隔多個訂單號）
 4. 勾選要列印的訂單
 5. 點擊「🖨️ 列印選中」
 
 **新單監聽自動列印**：
 1. 在運單列印頁開啟「🔔 新單監聽自動列印」開關
-2. 選擇列印方式（預設原單 A4）
+2. 選擇列印方式和類型（預設收據(A4)）
 3. 系統會自動偵測新訂單並列印（每 20 秒檢查一次）
+
+### 打印機設定（⚙️ 設定 → 打印機設定）
+- **A4 打印機**：收據(A4) 與 運單(A4) 都送到這台
+- **Label 打印機**：二選一
+  - 本地打印機（經 Windows 驅動）→ 下方選一台 Windows 印表機
+  - 網絡 (IP) — ZPL 直通 → 下方填標籤機 IP 與埠（預設 9100）
+- 收據(Label)（A4 對切 2 聯）與 運單(Label)（官方 A6 航運標籤）都送到 Label 打印機
 
 ### 地址管理
 1. 點擊左側選單「📍地址管理」
@@ -126,7 +144,8 @@ restart_keepalive.bat     # 只啟動 Keepalive
 │  - /api/orders                          │
 │  - /api/addresses (CRUD)                │
 │  - /api/geo/* (國家/城市/地區/區域)      │
-│  - /api/print-waybill (GDI/ZPL)         │
+│  - /api/print-waybill（4 種模式）        │
+│    收據/運單 × A4/Label；Label 可 GDI/ZPL│
 │  - /api/printers                        │
 └──────────────┬──────────────────────────┘
                │ 讀取 token.json
@@ -208,6 +227,8 @@ Teamwork API 基址：`https://hk-teamwork-api-rp.transnational-grp.com`
 
 主要端點：
 - 訂單列表：`POST /api/Order/GetAllOrders`
+- 官方運單 A4：`POST /api/OrderForm/GetOrderFormA4File`（body `{"OrderNo": "...", "NumCopy": 2}`）→ 原始 PDF
+- 官方運單 A6：`POST /api/OrderForm/GetOrderFormA6File`（body `{"OrderNo": "..."}`）→ 原始 PDF
 - 地址列表：`POST /api/Contact/GetContactAddressByContactId`
 - 地址新增：`POST /api/Contact/SavecontactAddress`（INSERT ONLY，無去重）
 - 地址更新：`PUT /api/Contact/UpdateContactAddress`

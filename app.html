@@ -1475,11 +1475,12 @@
             <div class="settings-card">
                 <div class="settings-card-title">🖨️ 列印選項</div>
                 <div class="settings-row">
-                    <label>列印方式</label>
+                    <label>列印方式和類型</label>
                     <select id="print-mode-select" class="settings-select" onchange="updatePrintModeHint()">
-                        <option value="a4" selected>原單 (A4)</option>
-                        <option value="label">標籤機</option>
-                        <option value="label-zpl">標簽機 (ZPL)</option>
+                        <option value="receipt-a4" selected>收據(A4)</option>
+                        <option value="receipt-label">收據(Label)</option>
+                        <option value="orderform-a4">運單(A4)</option>
+                        <option value="orderform-label">運單(Label)</option>
                     </select>
                 </div>
                 <div class="settings-hint" id="print-mode-hint">載入中…</div>
@@ -1497,11 +1498,12 @@
                     </label>
                 </div>
                 <div class="settings-row">
-                    <label>列印方式</label>
+                    <label>列印方式和類型</label>
                     <select id="watch-mode-select" class="settings-select" onchange="onWatchModeChange()">
-                        <option value="a4" selected>原單 (A4)</option>
-                        <option value="label">標籤機</option>
-                        <option value="label-zpl">標簽機 (ZPL)</option>
+                        <option value="receipt-a4" selected>收據(A4)</option>
+                        <option value="receipt-label">收據(Label)</option>
+                        <option value="orderform-a4">運單(A4)</option>
+                        <option value="orderform-label">運單(Label)</option>
                     </select>
                 </div>
                 <div class="settings-hint" id="watch-mode-hint"></div>
@@ -1551,39 +1553,46 @@
                 </div>
             </div>
             
-            <!-- 本地打印機 -->
+            <!-- 打印機設定 -->
             <div class="settings-card">
-                <div class="settings-card-title">🖨️ 本地打印機</div>
+                <div class="settings-card-title">🖨️ 打印機設定</div>
                 <div class="settings-row">
-                    <label>原始運單打印機 (A4)</label>
+                    <label>A4 打印機</label>
                     <select id="set-a4-printer" class="settings-select">
                         <option value="">（未設定）</option>
                     </select>
                 </div>
+                <div class="settings-hint">收據(A4) 與 運單(A4) 都送到這台。</div>
                 <div class="settings-row">
-                    <label>標籤運單打印機 (Label)</label>
-                    <select id="set-label-printer" class="settings-select">
-                        <option value="">（未設定）</option>
+                    <label>Label 打印機</label>
+                    <select id="set-label-transport" class="settings-select" onchange="onLabelTransportChange()">
+                        <option value="local">本地打印機（經 Windows 驅動）</option>
+                        <option value="zpl">網絡 (IP) — ZPL 直通</option>
                     </select>
                 </div>
-                <div class="settings-hint">經 Windows 印表機驅動直送：PDF 以 300dpi 點陣化後用 <b>GDI 直接列印</b>，無對話框、無彈窗；<b>不需</b> Adobe / Foxit 等任何 PDF 程式。</div>
+                <div id="label-local-box">
+                    <div class="settings-row">
+                        <label>本地 Label 打印機</label>
+                        <select id="set-label-printer" class="settings-select">
+                            <option value="">（未設定）</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="label-zpl-box" style="display:none">
+                    <div class="settings-row">
+                        <label>標籤機 IP</label>
+                        <input type="text" id="set-zpl-ip" class="settings-input" placeholder="192.168.168.251">
+                    </div>
+                    <div class="settings-row">
+                        <label>埠 Port</label>
+                        <input type="text" id="set-zpl-port" class="settings-input" placeholder="9100" value="9100">
+                    </div>
+                    <div class="settings-hint">不經 Windows 驅動，直接把 ZPL 送到印表機 raw 埠（預設 9100）。</div>
+                </div>
+                <div class="settings-hint">收據(Label)（A4 對切 2 聯）與 運單(Label)（官方 A6 航運標籤）都送到 Label 打印機。本地路徑經 Windows 驅動以 <b>GDI 直接列印</b>，無對話框、無彈窗；<b>不需</b> Adobe / Foxit 等任何 PDF 程式。</div>
                 <div class="settings-actions">
                     <button class="btn btn-secondary btn-sm" onclick="reloadPrintersInSettings()">🔄 重新載入打印機清單</button>
                 </div>
-            </div>
-            
-            <!-- 網絡 (IP) -->
-            <div class="settings-card">
-                <div class="settings-card-title">🌐 網絡 (IP) — ZPL 直通</div>
-                <div class="settings-row">
-                    <label>標籤機 IP</label>
-                    <input type="text" id="set-zpl-ip" class="settings-input" placeholder="192.168.168.251">
-                </div>
-                <div class="settings-row">
-                    <label>埠 Port</label>
-                    <input type="text" id="set-zpl-port" class="settings-input" placeholder="9100" value="9100">
-                </div>
-                <div class="settings-hint">不經 Windows 驅動，直接把 ZPL 送到印表機 raw 埠（預設 9100）；此路徑同樣不需任何 PDF 程式。</div>
             </div>
             
             <!-- 自動刷新 -->
@@ -2034,14 +2043,16 @@
                     labelPrinter: s.labelPrinter || '',
                     zplIp: s.zplIp || '',
                     zplPort: String(s.zplPort || '9100'),
+                    labelTransport: s.labelTransport === 'zpl' ? 'zpl' : 'local',   // Label 傳輸方式
                     autoRefresh: s.autoRefresh !== false,           // 預設開啟自動刷新
                     refreshSec: parseInt(s.refreshSec, 10) || 30,   // 預設 30 秒
                     watchEnabled: s.watchEnabled === true,          // 預設關閉（自動列印會耗紙，需明確開啟）
-                    watchMode: s.watchMode || 'a4'                  // 預設原單 (A4)
+                    watchMode: normPrintMode(s.watchMode)           // 預設收據(A4)
                 };
             } catch (e) {
                 return { darkMode: true, a4Printer: '', labelPrinter: '', zplIp: '', zplPort: '9100',
-                         autoRefresh: true, refreshSec: 30, watchEnabled: false, watchMode: 'a4' };
+                         labelTransport: 'local', autoRefresh: true, refreshSec: 30,
+                         watchEnabled: false, watchMode: 'receipt-a4' };
             }
         }
 
@@ -2083,6 +2094,12 @@
                 const m = s.labelPrinter.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
                 if (m) { s.zplIp = m[1]; changed = true; }
             }
+            // 舊版 watchMode（a4 / label / label-zpl）遷移；label-zpl 另外把 Label 傳輸改成 ZPL 直通
+            if (s.watchMode === 'label-zpl') {
+                s.watchMode = 'receipt-label'; s.labelTransport = 'zpl'; changed = true;
+            } else if (s.watchMode && !PRINT_MODES[s.watchMode]) {
+                s.watchMode = normPrintMode(s.watchMode); changed = true;
+            }
             if (changed) localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
             updatePrintModeHint();
             console.log('設定載入完成:', JSON.stringify(getSettings()));
@@ -2111,9 +2128,22 @@
             fillPrinterSelect('set-label-printer', s.labelPrinter);
             document.getElementById('set-zpl-ip').value = s.zplIp || '';
             document.getElementById('set-zpl-port').value = s.zplPort || '9100';
+            const ltEl = document.getElementById('set-label-transport');
+            if (ltEl) ltEl.value = (s.labelTransport === 'zpl') ? 'zpl' : 'local';
+            onLabelTransportChange();
             document.getElementById('auto-refresh-toggle').checked = s.autoRefresh !== false;
             document.getElementById('set-refresh-sec').value = s.refreshSec || 30;
             document.getElementById('settings-saved-hint').textContent = '';
+        }
+
+        // Label 打印機二選一：本地打印機（Windows 驅動）或 網絡 (IP) ZPL 直通
+        function onLabelTransportChange() {
+            const sel = document.getElementById('set-label-transport');
+            const isZpl = sel && sel.value === 'zpl';
+            const localBox = document.getElementById('label-local-box');
+            const zplBox = document.getElementById('label-zpl-box');
+            if (localBox) localBox.style.display = isZpl ? 'none' : '';
+            if (zplBox) zplBox.style.display = isZpl ? '' : 'none';
         }
 
         async function reloadPrintersInSettings() {
@@ -2130,6 +2160,8 @@
             s.labelPrinter = document.getElementById('set-label-printer').value;
             s.zplIp = document.getElementById('set-zpl-ip').value.trim();
             s.zplPort = document.getElementById('set-zpl-port').value.trim() || '9100';
+            const ltSave = document.getElementById('set-label-transport');
+            if (ltSave) s.labelTransport = (ltSave.value === 'zpl') ? 'zpl' : 'local';
             s.darkMode = document.getElementById('dark-mode-toggle').checked;
             const arEl = document.getElementById('auto-refresh-toggle');
             if (arEl) s.autoRefresh = arEl.checked;
@@ -2143,37 +2175,57 @@
             showToast('✅ 設定已儲存', 'ok');
         }
 
-        // 依列印方式（'a4' / 'label' / 'label-zpl'）+ 設定，解析實際要用的印表機／通道
-        // 預設為 'a4'（原單 A4）—— 快速列印、運單列印、新單監聽都用同一個解析邏輯
+        // 列印方式和類型（4 種）—— 來源 × 尺寸：
+        //   收據(A4)      訂單收據 receiptFile        → A4 打印機（GDI）
+        //   收據(Label)   訂單收據 receiptFile        → Label 打印機（A4 對切 2 聯）
+        //   運單(A4)      官方 Order Form A4File      → A4 打印機（GDI）
+        //   運單(Label)   官方 Order Form A6File      → Label 打印機（官方 A6 航運標籤，不裁切）
+        const PRINT_MODES = {
+            'receipt-a4':      { source: 'receipt',   role: 'a4',    label: '收據(A4)' },
+            'receipt-label':   { source: 'receipt',   role: 'label', label: '收據(Label)' },
+            'orderform-a4':    { source: 'orderform', role: 'a4',    label: '運單(A4)' },
+            'orderform-label': { source: 'orderform', role: 'label', label: '運單(Label)' }
+        };
+        // 舊版模式值（a4 / label / label-zpl）→ 新版
+        const LEGACY_MODE_MAP = { 'a4': 'receipt-a4', 'label': 'receipt-label', 'label-zpl': 'receipt-label' };
+
+        function normPrintMode(mode) {
+            if (PRINT_MODES[mode]) return mode;
+            return LEGACY_MODE_MAP[mode] || 'receipt-a4';
+        }
+
+        // 解析實際要用的來源／印表機／送印方式（快速列印、運單列印、新單監聽共用）
         function resolvePrintTarget(mode) {
             const s = getSettings();
-            if (mode === 'label-zpl') {
-                return { mode: 'label-zpl', printer: s.labelPrinter, channel: 'zpl',
-                         zplIp: s.zplIp, zplPort: s.zplPort, label: '標簽機 (ZPL)' };
+            const key = normPrintMode(mode);
+            const d = PRINT_MODES[key];
+            if (d.role === 'a4') {
+                return { mode: key, source: d.source, doc: 'a4', transport: 'gdi',
+                         printer: s.a4Printer, label: d.label };
             }
-            if (mode === 'label') {
-                return { mode: 'label', printer: s.labelPrinter, channel: 'pdf', label: '標籤機' };
-            }
-            return { mode: 'a4', printer: s.a4Printer, channel: 'pdf', label: '原單 (A4)' };
+            const transport = (s.labelTransport === 'zpl') ? 'zpl' : 'gdi';
+            return { mode: key, source: d.source, doc: 'label', transport: transport,
+                     printer: s.labelPrinter, zplIp: s.zplIp, zplPort: s.zplPort, label: d.label };
         }
 
         function printTargetHint(t) {
             const s = getSettings();
-            if (t.mode === 'a4') {
-                return '印表機：' + (s.a4Printer || '（未設定 → 請到左下「設定」選擇）')
-                    + ' — GDI 直印（經印表機驅動），原始 A4 運單一張';
+            const src = '來源：' + (t.source === 'orderform' ? '官方 Order Form' : '訂單收據');
+            if (t.doc === 'a4') {
+                return src + ' → 印表機：' + (s.a4Printer || '（未設定 → 請到左下「設定」選擇）')
+                    + ' — GDI 直印（經印表機驅動）';
             }
-            if (t.mode === 'label-zpl') {
-                return 'ZPL 直送 ' + (s.zplIp || '（未設定 IP → 請到左下「設定」填寫）')
+            if (t.transport === 'zpl') {
+                return src + ' → ZPL 直送 ' + (s.zplIp || '（未設定 IP → 請到左下「設定」填寫）')
                     + ':' + (s.zplPort || '9100') + ' — 直接送 raw 埠，不經驅動';
             }
-            return '印表機：' + (s.labelPrinter || '（未設定 → 請到左下「設定」選擇）')
-                + ' — GDI 直印（經印表機驅動），102x210 兩張';
+            return src + ' → 印表機：' + (s.labelPrinter || '（未設定 → 請到左下「設定」選擇）')
+                + ' — GDI 直印（經印表機驅動）';
         }
 
         function getPrintTarget() {
             const sel = document.getElementById('print-mode-select');
-            return resolvePrintTarget(sel ? sel.value : 'a4');
+            return resolvePrintTarget(sel ? sel.value : 'receipt-a4');
         }
 
         function updatePrintModeHint() {
@@ -2185,14 +2237,15 @@
         
         // 送印的唯一入口（快速列印／批量列印／新單自動列印共用）
         async function sendPrintRequest(invoiceId, t) {
-            if (t.channel !== 'zpl' && !t.printer) {
+            if (t.transport !== 'zpl' && !t.printer) {
                 return { success: false, error: '未設定「' + t.label + '」印表機（請到左下「設定」選擇）' };
             }
             try {
                 const r = await fetch('/api/print-waybill', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ InvoiceId: invoiceId, printer: t.printer, channel: t.channel,
+                    body: JSON.stringify({ InvoiceId: invoiceId, printer: t.printer,
+                                           source: t.source, doc: t.doc, transport: t.transport,
                                            zpl_ip: t.zplIp, zpl_port: t.zplPort })
                 });
                 return await r.json();
@@ -2202,8 +2255,8 @@
         }
         
         async function quickPrintWaybill(invoiceId, button) {
-            // 快速列印 = 預設「原單 (A4)」（與運單列印頁的預設一致）
-            const t = resolvePrintTarget('a4');
+            // 快速列印 = 預設「收據(A4)」（與運單列印頁的預設一致）
+            const t = resolvePrintTarget('receipt-a4');
             const originalText = button.innerHTML;
             
             button.innerHTML = '⏳';
@@ -2378,7 +2431,7 @@
             // 依「列印選項」+ 設定決定印表機與通道
             const t2 = getPrintTarget();
             const printer = t2.printer;
-            if (t2.channel !== 'zpl' && !printer) {
+            if (t2.transport !== 'zpl' && !printer) {
                 showToast('❌ 請先到左下「設定」選擇打印機', 'err');
                 return;
             }
@@ -3049,7 +3102,7 @@
 
         function watchCfg() {
             const s = getSettings();
-            return { on: s.watchEnabled === true, mode: s.watchMode || 'a4' };
+            return { on: s.watchEnabled === true, mode: normPrintMode(s.watchMode) };
         }
 
         function getWatchSeen() {
@@ -3129,7 +3182,7 @@
         function onWatchModeChange() {
             const sel = document.getElementById('watch-mode-select');
             const s = getSettings();
-            s.watchMode = sel ? sel.value : 'a4';
+            s.watchMode = normPrintMode(sel ? sel.value : 'receipt-a4');
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
             updatePrintModeHint();
             showToast('🔔 自動列印方式改為：' + resolvePrintTarget(s.watchMode).label, 'ok');
@@ -3177,7 +3230,7 @@
             const we = document.getElementById('watch-enabled');
             if (we) we.checked = s.watchEnabled === true;
             const wm = document.getElementById('watch-mode-select');
-            if (wm) wm.value = s.watchMode || 'a4';
+            if (wm) wm.value = normPrintMode(s.watchMode);
             renderRefreshHints();
             renderWatchLog();
             updatePrintModeHint();
