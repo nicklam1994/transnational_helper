@@ -3225,10 +3225,12 @@
                 if (!watchBurstWarned) {
                     watchBurstWarned = true;
                     const msg = '一次發現 ' + fresh.length + ' 筆新單，超過上限 ' + WATCH_BURST_LIMIT
-                              + ' → 已暫停自動列印，請按「↺ 重設基準」';
+                              + ' → 已暫停自動列印。若確是累積的新單（例如休息日後）：先手動「列印選中」補印，'
+                              + '再按「↺ 重設基準」；若屬基準失效：直接按「↺ 重設基準」即可。';
                     addWatchLog({ t: new Date().toLocaleTimeString('zh-TW', { hour12: false }), no: '—',
                                   ok: false, label: '⏸ 已暫停', msg: msg });
-                    showToast('⚠️ ' + msg, 'err');
+                    showToast('⚠️ 一次發現 ' + fresh.length + ' 筆新單（超過上限 ' + WATCH_BURST_LIMIT
+                              + '）→ 已暫停自動列印，詳見下方記錄', 'err');
                 }
                 renderWatchLog();
                 return;
