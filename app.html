@@ -3099,6 +3099,14 @@
         const WATCH_SEEN_KEY = 'dhWatchSeen';
         const WATCH_LOG_KEY = 'dhWatchLog';
         const WATCH_INTERVAL_MS = 20000;
+        // 基準筆數上限：必須遠高於實際訂單量（2026-10-08 訂單量 555→805，舊上限 800 被跨過，
+        // 因 API 是「新→舊」排序，被截掉的正好是最新幾筆 → 每次 poll 都重印那幾筆舊單，一路向舊走）。
+        // 20,000 筆約 140KB，localStorage 可容，正常永遠不會截斷。
+        const WATCH_SEEN_MAX = 20000;
+        // 單次 poll 發現「新單」的上限：每日約 17 筆新單，一次超過 30 筆幾乎肯定是基準失效，
+        // 為免浪費紙張先暫停並提示，而不是把幾百張舊運單全印出來。
+        const WATCH_BURST_LIMIT = 30;
+        let watchBurstWarned = false;
 
         function watchCfg() {
             const s = getSettings();
@@ -3111,7 +3119,18 @@
         }
 
         function setWatchSeen(set) {
-            localStorage.setItem(WATCH_SEEN_KEY, JSON.stringify(Array.from(set).slice(-800)));
+            let arr = Array.from(set);
+            if (arr.length > WATCH_SEEN_MAX) {
+                // 只會在異常情況下發生 —— 一定要出聲，不可像 2026-10-08 那樣靜默丟棄造成重印
+                const dropped = arr.length - WATCH_SEEN_MAX;
+                console.warn('[watch] 基準筆數 ' + arr.length + ' 超過上限 ' + WATCH_SEEN_MAX
+                             + '，丟棄最舊 ' + dropped + ' 筆');
+                addWatchLog({ t: new Date().toLocaleTimeString('zh-TW', { hour12: false }), no: '—',
+                              ok: false, label: '⚠️ 基準超限',
+                              msg: '已達 ' + arr.length + ' 筆上限，丟棄 ' + dropped + ' 筆（建議重設基準）' });
+                arr = arr.slice(-WATCH_SEEN_MAX);
+            }
+            localStorage.setItem(WATCH_SEEN_KEY, JSON.stringify(arr));
         }
 
         function getWatchLog() {
@@ -3160,8 +3179,10 @@
                 const seen = getWatchSeen();
                 (data.orders || []).forEach(function(o) { if (o.InvoiceId) seen.add(o.InvoiceId); });
                 setWatchSeen(seen);
+                watchBurstWarned = false;
                 renderWatchLog();
-                if (!silent) showToast('↺ 已把現有 ' + (data.orders || []).length + ' 筆訂單設為基準（不會自動列印）', 'ok');
+                if (!silent) showToast('↺ 已把現有 ' + (data.orders || []).length + ' 筆訂單設為基準（不會自動列印）｜基準共 '
+                                       + getWatchSeen().size + ' 筆', 'ok');
             } catch (e) { console.error('設定基準失敗:', e); }
         }
 
@@ -3196,7 +3217,23 @@
             if (!data.success) return;
             const seen = getWatchSeen();
             const fresh = (data.orders || []).filter(function(o) { return o.InvoiceId && !seen.has(o.InvoiceId); });
-            if (fresh.length === 0) { renderWatchLog(); return; }
+            if (fresh.length === 0) { watchBurstWarned = false; renderWatchLog(); return; }
+
+            // 爆發保護：一次發現太多「新單」＝ 基準失效（例如上限截斷、localStorage 被清），
+            // 這時候寧可暫停並提示，也不要浪費幾百張紙。正常運作（每日約 17 筆）不會觸發。
+            if (fresh.length > WATCH_BURST_LIMIT) {
+                if (!watchBurstWarned) {
+                    watchBurstWarned = true;
+                    const msg = '一次發現 ' + fresh.length + ' 筆新單，超過上限 ' + WATCH_BURST_LIMIT
+                              + ' → 已暫停自動列印，請按「↺ 重設基準」';
+                    addWatchLog({ t: new Date().toLocaleTimeString('zh-TW', { hour12: false }), no: '—',
+                                  ok: false, label: '⏸ 已暫停', msg: msg });
+                    showToast('⚠️ ' + msg, 'err');
+                }
+                renderWatchLog();
+                return;
+            }
+            watchBurstWarned = false;
 
             const t = resolvePrintTarget(c.mode);
             for (const o of fresh) {
